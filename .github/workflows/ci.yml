@@ -2,6 +2,8 @@ name: CI Pipeline
 
 # Báo cho GitHub biết: Chỉ chạy test khi có ai đó tạo Pull Request đòi gộp code vào nhánh 'dev'
 on:
+  push:
+    branches: [ "dev" ]
   pull_request:
     branches: [ "dev" ]
 
