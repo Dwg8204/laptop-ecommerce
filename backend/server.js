@@ -2,37 +2,25 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
-const db = require('./config/db');
-
+// Khởi tạo app
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+// 1. MIDDLEWARES (Xử lý dữ liệu đầu vào)
+app.use(cors()); // Cho phép Frontend gọi API không bị chặn
+app.use(express.json()); // Giúp server đọc được dữ liệu dạng JSON
+app.use(express.urlencoded({ extended: true }));
 
-// API test server
-app.get('/', (req, res) => {
-    res.json({ message: 'Server Web Laptop đang chạy ngon lành!' });
+// 2. IMPORT ROUTES 
+const sliderRoutes = require('./routes/sliderRoutes');
+
+// 3. Routes
+app.use('/api/sliders', sliderRoutes);
+
+app.use((req, res, next) => {
+    res.status(404).json({ success: false, message: 'Đường dẫn API không tồn tại!' });
 });
 
-// API test truy vấn Database thực tế
-app.get('/api/test-db', async (req, res) => {
-    try {
-        // Thử chọc vào database, đếm xem có bao nhiêu bảng
-        const [rows] = await db.query("SHOW TABLES");
-        res.json({
-            success: true,
-            message: 'Đã kết nối và lấy dữ liệu Database thành công!',
-            tables: rows
-        });
-    } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: 'Lỗi truy vấn Database', 
-            error: error.message 
-        });
-    }
-});
-
+// 5. KHỞI ĐỘNG SERVER
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server đang chạy tại port ${PORT}`);
