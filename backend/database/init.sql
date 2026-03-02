@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS payments (
     payment_method ENUM('COD', 'VNPAY', 'MOMO') NOT NULL,
     payment_status ENUM('UNPAID', 'DEPOSITED', 'PAID', 'REFUNDED') DEFAULT 'UNPAID',
     transaction_id VARCHAR(100) DEFAULT NULL,
-    payment_date TIMESTAMP DEFAULT NULL,
+    payment_date TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
 );
 
