@@ -3,9 +3,16 @@ const db = require('../config/db');
 const Slider = {
     // Hàm lấy tất cả banner, sắp xếp theo thứ tự hiển thị
     getAll: async () => {
-        const query = 'SELECT * FROM slider_banners ORDER BY display_order ASC';
+        const query = 'SELECT * FROM slider_banners WHERE status = "VISIBLE" ORDER BY display_order ASC';
         const [rows] = await db.query(query);
         return rows;
+    },
+
+    //Hàm lấy banner theo ID 
+    getById: async (id) => {
+        const query = 'SELECT id, title, image_url, link_url, display_order, status FROM slider_banners WHERE id = ? LIMIT 1';
+        const [rows] = await db.query(query, [id]);
+        return rows[0] || null; // Trả về null nếu không tìm thấy
     },
 
     // Hàm tạo banner mới
@@ -31,6 +38,35 @@ const Slider = {
 
         const [result] = await db.query(query, values);
         return result.insertId; // Trả về ID của dòng vừa thêm
+    },
+
+    // Hàm cập nhật banner 
+    
+    update : async (id, data) => {
+        const allowedFields = ['title', 'image_url', 'link_url', 'display_order', 'status'];
+        const fieldsToUpdate = [];
+        const values = [];
+
+        allowedFields.forEach(field => {
+            if (data[field] !== undefined) {
+                fieldsToUpdate.push(`${field} = ?`);
+                values.push(data[field]);
+            }
+        });
+
+        if (fieldsToUpdate.length === 0) {
+            throw new Error('Không có trường nào để cập nhật');
+        }
+        values.push(id); // Thêm ID vào cuối mảng giá trị để dùng trong WHERE
+        
+        const query = `
+            UPDATE slider_banners 
+            SET ${fieldsToUpdate.join(', ')}
+            WHERE id = ?
+        `;
+        
+        const [result] = await db.query(query, values);
+        return result.affectedRows; 
     }
 };
 
