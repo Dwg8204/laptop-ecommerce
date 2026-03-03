@@ -10,7 +10,7 @@ const Slider = {
 
     //Hàm lấy banner theo ID 
     getById: async (id) => {
-        const query = 'SELECT id, title, image_url, link_url, display_order, status FROM slider_banners WHERE id = ? LIMIT 1';
+        const query = 'SELECT slider_id, creator_id, title, image_url, link_url, display_order, status FROM slider_banners WHERE slider_id = ? LIMIT 1';
         const [rows] = await db.query(query, [id]);
         return rows[0] || null; // Trả về null nếu không tìm thấy
     },
@@ -62,7 +62,7 @@ const Slider = {
         const query = `
             UPDATE slider_banners 
             SET ${fieldsToUpdate.join(', ')}
-            WHERE id = ?
+            WHERE slider_id = ?
         `;
         
         const [result] = await db.query(query, values);
