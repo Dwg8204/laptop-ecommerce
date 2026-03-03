@@ -19,24 +19,32 @@ const sliderController = {
     // API Thêm mới Slider (POST)
     createSlider: async (req, res) => {
         try {
-            // Lấy dữ liệu từ Frontend gửi lên (body)
-            const { title, image_url } = req.body;
-
-            // Kiểm tra các trường bắt buộc
-            if (!title || !image_url) {
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'Thiếu thông tin bắt buộc: title hoặc image_url' 
-                });
+            const { title, link_url, display_order, status } = req.body;
+            
+            // req.file chính là file ảnh mà multer vừa lưu xong
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: 'Vui lòng upload ảnh banner!' });
             }
 
-            // Gọi Model để lưu vào Database
-            const newId = await Slider.create(req.body);
+            // Tạo đường dẫn URL cho ảnh (Ví dụ: /uploads/sliders/image-12345.jpg)
+            // const image_url = `/uploads/sliders/${req.file.filename}`;
+            const image_url = req.file.path; // Đây là URL trả về từ Cloudinary sau khi upload thành công
+            // Tạo cục data để gửi cho Model
+            const sliderData = {
+                title,
+                image_url, // Gắn cái URL vừa tạo vào Database
+                link_url,
+                display_order,
+                status,
+                creator_id: null // Tạm thời để null vì chưa làm đăng nhập Admin
+            };
+
+            const newId = await Slider.create(sliderData); // Gọi hàm ở file Model (không cần sửa file Model)
 
             res.status(201).json({ 
                 success: true, 
-                message: 'Thêm Slider mới thành công!',
-                data: { id: newId, ...req.body }
+                message: 'Thêm Slider và upload ảnh thành công!',
+                data: { id: newId, image_url }
             });
         } catch (error) {
             console.error(error);

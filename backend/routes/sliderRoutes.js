@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const sliderController = require('../controllers/sliderController');
+const uploadSlider = require('../middlewares/uploadMiddleware'); // Import multer
 
-// Phân luồng:
-// - Phương thức GET gọi tới hàm getAllSliders
-// - Phương thức POST gọi tới hàm createSlider
+// Khi gọi POST, nó sẽ chạy qua uploadSlider để lưu file 'image' trước, rồi mới chạy vào Controller
+router.post('/', uploadSlider.single('image'), sliderController.createSlider);
 router.get('/', sliderController.getAllSliders);
-router.post('/', sliderController.createSlider);
 
 module.exports = router;
