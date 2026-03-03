@@ -4,7 +4,7 @@ require('dotenv').config();
 
 // Khởi tạo app
 const app = express();
-
+const path = require('path');
 // 1. MIDDLEWARES (Xử lý dữ liệu đầu vào)
 app.use(cors()); // Cho phép Frontend gọi API không bị chặn
 app.use(express.json()); // Giúp server đọc được dữ liệu dạng JSON
@@ -15,7 +15,7 @@ const sliderRoutes = require('./routes/sliderRoutes');
 
 // 3. Routes
 app.use('/api/sliders', sliderRoutes);
-
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Cho phép truy cập trực tiếp vào thư mục uploads qua URL
 app.use((req, res, next) => {
     res.status(404).json({ success: false, message: 'Đường dẫn API không tồn tại!' });
 });
