@@ -67,6 +67,17 @@ const Slider = {
         
         const [result] = await db.query(query, values);
         return result.affectedRows; 
+    },
+
+    // Hàm xóa mềm slider
+    softDelete: async (id) => {
+        const query = `
+            UPDATE slider_banners 
+            SET status = 'HIDDEN' 
+            WHERE slider_id = ?
+        `;
+        const [result] = await db.query(query, [id]);
+        return result.affectedRows; 
     }
 };
 

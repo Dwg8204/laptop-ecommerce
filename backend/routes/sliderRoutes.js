@@ -8,4 +8,5 @@ router.post('/', uploadSlider.single('image'), sliderController.createSlider);
 router.get('/', sliderController.getAllSliders);
 router.get('/:id', sliderController.getSliderById);
 router.put('/:id', uploadSlider.single('image'), sliderController.updateSlider);
+router.delete('/:id', sliderController.deleteSlider);
 module.exports = router;
