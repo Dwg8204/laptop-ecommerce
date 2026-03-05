@@ -1,5 +1,8 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+require('dotenv').config();
+
+const swaggerServerUrl = process.env.SWAGGER_SERVER_URL || `http://localhost:${process.env.PORT || 5000}`;
 
 // Cấu hình OpenAPI 3.0
 const swaggerOptions = {
@@ -16,7 +19,7 @@ const swaggerOptions = {
         },
         servers: [
             {
-                url: 'http://localhost:5000',
+                url: swaggerServerUrl,
                 description: 'Development server'
             }
         ],
@@ -28,6 +31,14 @@ const swaggerOptions = {
             {
                 name: 'Sliders',
                 description: 'API quản lý banner sliders'
+            },
+            {
+                name: 'Blog Categories',
+                description: 'API quản lý danh mục tin tức'
+            },
+            {
+                name: 'Blog Posts',
+                description: 'API quản lý bài viết tin tức'
             }
         ],
         components: {
@@ -141,6 +152,99 @@ const swaggerOptions = {
                             type: 'string',
                             format: 'date-time',
                             description: 'Thời gian tạo tài khoản'
+                        }
+                    }
+                },
+                BlogCategory: {
+                    type: 'object',
+                    required: ['category_name'],
+                    properties: {
+                        category_id: {
+                            type: 'integer',
+                            description: 'ID danh mục',
+                            example: 1
+                        },
+                        category_name: {
+                            type: 'string',
+                            description: 'Tên danh mục',
+                            example: 'Khuyến mãi'
+                        },
+                        description: {
+                            type: 'string',
+                            description: 'Mô tả danh mục',
+                            example: 'Tin khuyến mãi, ưu đãi'
+                        },
+                        post_count: {
+                            type: 'integer',
+                            description: 'Số lượng bài viết trong danh mục',
+                            example: 5
+                        },
+                        created_at: {
+                            type: 'string',
+                            format: 'date-time',
+                            description: 'Thời gian tạo'
+                        }
+                    }
+                },
+                BlogPost: {
+                    type: 'object',
+                    required: ['title', 'content_html'],
+                    properties: {
+                        post_id: {
+                            type: 'integer',
+                            description: 'ID bài viết',
+                            example: 1
+                        },
+                        category_id: {
+                            type: 'integer',
+                            description: 'ID danh mục',
+                            example: 1
+                        },
+                        author_id: {
+                            type: 'integer',
+                            description: 'ID tác giả',
+                            example: 1
+                        },
+                        title: {
+                            type: 'string',
+                            description: 'Tiêu đề bài viết',
+                            example: 'Top 5 Laptop Gaming 2026'
+                        },
+                        thumbnail_url: {
+                            type: 'string',
+                            description: 'URL hình ảnh thumbnail',
+                            example: 'https://example.com/image.jpg'
+                        },
+                        content_html: {
+                            type: 'string',
+                            description: 'Nội dung HTML của bài viết',
+                            example: '<p>Nội dung bài viết...</p>'
+                        },
+                        view_count: {
+                            type: 'integer',
+                            description: 'Số lượt xem',
+                            example: 100
+                        },
+                        status: {
+                            type: 'string',
+                            enum: ['DRAFT', 'PUBLISHED', 'HIDDEN'],
+                            description: 'Trạng thái bài viết',
+                            example: 'PUBLISHED'
+                        },
+                        published_at: {
+                            type: 'string',
+                            format: 'date-time',
+                            description: 'Thời gian xuất bản'
+                        },
+                        category_name: {
+                            type: 'string',
+                            description: 'Tên danh mục',
+                            example: 'Khuyến mãi'
+                        },
+                        author_name: {
+                            type: 'string',
+                            description: 'Tên tác giả',
+                            example: 'Admin'
                         }
                     }
                 }
