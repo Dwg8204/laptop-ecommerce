@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import "../styles/BannerSlider.css"
+import { buildApiUrl } from "../config/api"
 
 export default function BannerSlider() {
   const [banners, setBanners] = useState([])
@@ -9,7 +10,7 @@ export default function BannerSlider() {
   const [error, setError] = useState("")  
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/sliders")
+    fetch(buildApiUrl("/api/sliders"))
       .then(res => res.json())
       .then(data => {
         setBanners(Array.isArray(data?.data) ? data.data : [])

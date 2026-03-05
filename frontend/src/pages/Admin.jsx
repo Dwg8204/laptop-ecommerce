@@ -33,7 +33,8 @@ import AdminRecommendation from "../components/admin/AdminRecommendation"
 import AdminAssistant from "../components/admin/AdminAssistant"
 import AdminStaff from "../components/admin/AdminStaff"
 import OrderDetailModal from "../components/admin/OrderDetailModal"
-import AdminNews from "../components/admin/AdminNews"  
+import AdminNews from "../components/admin/AdminNewsAPI"  
+import { buildApiUrl } from "../config/api"
 
 const moduleItems = [
   { id: "dashboard", label: "Dashboard", icon: FiBarChart2 },
@@ -151,7 +152,7 @@ export default function Admin() {
     setLoadingStaff(true)
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:5000/api/auth/admin/users", {
+      const response = await fetch(buildApiUrl("/api/auth/admin/users"), {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -392,7 +393,7 @@ export default function Admin() {
 
     try {
       const token = localStorage.getItem("token")
-      const response = await fetch("http://localhost:5000/api/auth/admin/users", {
+      const response = await fetch(buildApiUrl("/api/auth/admin/users"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

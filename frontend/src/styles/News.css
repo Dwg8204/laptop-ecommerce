@@ -27,6 +27,53 @@
   color: #666;
 }
 
+/* Filters */
+.news-filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+.filter-btn {
+  padding: 10px 24px;
+  background: #fff;
+  border: 2px solid #e0e0e0;
+  border-radius: 24px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+  border-color: #e30019;
+  color: #e30019;
+}
+
+.filter-btn.active {
+  background: #e30019;
+  border-color: #e30019;
+  color: #fff;
+}
+
+/* Loading & Empty States */
+.news-loading,
+.news-empty {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 18px;
+  color: #666;
+}
+
+.news-empty {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
 /* News Grid */
 .news-grid {
   display: grid;

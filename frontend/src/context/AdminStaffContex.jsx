@@ -1,5 +1,5 @@
-import { create } from "../../../backend/models/authAdmin"; 
-import { createContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
+import { buildApiUrl } from "../config/api";
 
 const AdminStaffContext = createContext();
 
@@ -9,7 +9,7 @@ export function AdminStaffProvider({ children }) {
   useEffect(() => {
     const fetchStaffList = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/admin/staff");
+        const res = await fetch(buildApiUrl("/api/admin/staff"));
         const data = await res.json();
         if (res.ok) {
           setStaffList(data);
