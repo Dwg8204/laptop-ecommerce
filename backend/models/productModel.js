@@ -149,7 +149,7 @@ const Product = {
 
 
     /**
-     * Lấy thông tin chi tiết một sản phẩm theo ID, bao gồm thông số kỹ thuật, hình ảnh, hãng và danh mục.
+     * Lấy thông tin chi tiết một sản phẩm theo ID, bao gồm thông số kỹ thuật, hình ảnh, hãng, danh mục VÀ ĐÁNH GIÁ SẢN PHẨM.
      * @param {number} id - ID của sản phẩm.
      * @returns {Promise<Object|null>} Đối tượng sản phẩm hoặc null nếu không tìm thấy.
      */
@@ -169,7 +169,7 @@ const Product = {
         const [productRows] = await db.query(query, [id]);
 
         if (productRows.length === 0) {
-            return null;
+            return null; // Sản phẩm không tồn tại
         }
 
         const product = productRows[0];
@@ -177,6 +177,23 @@ const Product = {
         // Lấy danh sách hình ảnh
         const [imageRows] = await db.query('SELECT image_id, image_url, is_primary FROM product_images WHERE product_id = ?', [id]);
         product.images = imageRows;
+
+        // 3. Lấy danh sách đánh giá của sản phẩm, bao gồm tên người dùng
+        const [reviewRows] = await db.query(
+            `SELECT 
+                pr.review_id, 
+                pr.user_id, 
+                u.full_name AS reviewer_name, 
+                pr.rating, 
+                pr.content, 
+                pr.created_at
+            FROM product_reviews pr
+            JOIN users u ON pr.user_id = u.user_id
+            WHERE pr.product_id = ?
+            ORDER BY pr.created_at DESC`, // Sắp xếp đánh giá mới nhất lên đầu
+            [id]
+        );
+        product.reviews = reviewRows;
 
         return product;
     },
