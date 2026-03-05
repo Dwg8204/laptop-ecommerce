@@ -98,6 +98,29 @@ const sliderController = {
             res.status(500).json({ success: false, message: 'Lỗi khi cập nhật Slider' });
 
         }
+    },
+
+    //API xóa mềm Slider (DELETE)
+    deleteSlider: async (req, res) => {
+        try{
+            const { id } = req.params;
+            const existingSlider = await Slider.getById(id);
+            if (!existingSlider) {
+                return res.status(404).json({ success: false, message: 'Slider không tồn tại!' });
+            }
+            const affectedRows = await Slider.softDelete(id);
+            if (affectedRows === 0) {
+                return res.status(400).json({ success: false, message: 'Không thể xóa Slider!' });
+            }
+
+            res.status(200).json({ 
+                success: true, 
+                message: 'Xóa Slider thành công!'
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ success: false, message: 'Lỗi khi xóa Slider' });
+        }
     }
 
 };
