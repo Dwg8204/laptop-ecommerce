@@ -2,11 +2,10 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const { swaggerUi, swaggerSpec } = require('./config/swagger');
+const path = require('path');
 
 
 const app = express();
-
-
 const corsOrigin = process.env.FRONTEND_ORIGIN
     ? process.env.FRONTEND_ORIGIN.split(',').map((origin) => origin.trim())
     : '*';
@@ -14,7 +13,6 @@ const corsOrigin = process.env.FRONTEND_ORIGIN
 app.use(cors({ origin: corsOrigin })); 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customSiteTitle: 'Laptop Shop API Docs',
@@ -25,6 +23,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 
 
 const sliderRoutes = require('./routes/sliderRoutes');
+const productRoutes = require('./routes/productRoutes');
+const brandRoutes = require('./routes/brandRoutes');
+const productCategoryRoutes = require('./routes/productCategoryRoutes');
 const authRoutes = require('./routes/authRoutes');
 const authAdminRoutes = require('./routes/authAdminRoutes');
 const blogRoutes = require('./routes/blogRoutes');
@@ -34,7 +35,10 @@ app.use('/api/sliders', sliderRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/admin', authAdminRoutes);
 app.use('/api/blog', blogRoutes);
-
+app.use('/api/products', productRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/product-categories', productCategoryRoutes);
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Cho phép truy cập trực tiếp vào thư mục uploads qua URL
 app.use((req, res, next) => {
     res.status(404).json({ success: false, message: 'Đường dẫn API không tồn tại!' });
 });
