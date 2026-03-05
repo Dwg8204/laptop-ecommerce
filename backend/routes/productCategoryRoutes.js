@@ -3,18 +3,18 @@ const router = express.Router();
 const productCategoryController = require('../controllers/productCategoryController');
 
 // GET tất cả danh mục (có thể kèm query param 'tree=true')
-router.get('/', categoryController.getAllCategories);
+router.get('/', productCategoryController.getAllCategories);
 
 // GET chi tiết danh mục theo ID
-router.get('/:id', categoryController.getCategoryById);
+router.get('/:id', productCategoryController.getCategoryById);
 
 // POST tạo mới danh mục
-router.post('/', categoryController.createCategory);
+router.post('/', productCategoryController.createCategory);
 
 // PUT cập nhật danh mục theo ID
-router.put('/:id', categoryController.updateCategory);
+router.put('/:id', productCategoryController.updateCategory);
 
 // DELETE danh mục theo ID
-router.delete('/:id', categoryController.deleteCategory);
+router.delete('/:id', productCategoryController.deleteCategory);
 
 module.exports = router;
