@@ -2,11 +2,11 @@ const db = require('../config/db');
 
 const BlogCategory = {
     getAll: async () => {
-        const [rows] = await db.query('SELECT * FROM blog_categories ORDER BY created_at DESC');
+        const [rows] = await db.query('SELECT category_name, created_at FROM blog_categories ORDER BY created_at DESC');
         return rows;
     },
     getById: async (id) => {
-        const [rows] = await db.query('SELECT * FROM blog_categories WHERE category_id = ?', [id]);
+        const [rows] = await db.query('SELECT category_id, category_name, description FROM blog_categories WHERE category_id = ?', [id]);
         return rows[0] || null;
     },
     create: async (data) => {
