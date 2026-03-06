@@ -3,11 +3,11 @@ require('dotenv').config();
 
 // Tạo Connection Pool
 const pool = mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT, // Trỏ đúng vào cổng 3307 của bạn
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'laptop_ecommerce_db',
+    port: Number(process.env.DB_PORT) || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
@@ -16,7 +16,9 @@ const pool = mysql.createPool({
 // Chạy test kết nối ngay khi file này được gọi
 pool.getConnection()
     .then(connection => {
-        console.log(`✅ Kết nối thành công đến MySQL (DB: ${process.env.DB_NAME}) trên cổng ${process.env.DB_PORT}`);
+        console.log(
+            `✅ Kết nối thành công đến MySQL (DB: ${process.env.DB_NAME || 'laptop_ecommerce_db'}) trên cổng ${process.env.DB_PORT || 3306}`
+        );
         connection.release(); // Trả kết nối lại cho Pool
     })
     .catch(err => {

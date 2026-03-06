@@ -1,28 +1,51 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-
-// Khởi tạo app
-const app = express();
+const { swaggerUi, swaggerSpec } = require('./config/swagger');
 const path = require('path');
-// 1. MIDDLEWARES (Xử lý dữ liệu đầu vào)
-app.use(cors()); // Cho phép Frontend gọi API không bị chặn
-app.use(express.json()); // Giúp server đọc được dữ liệu dạng JSON
+
+
+const app = express();
+const corsOrigin = process.env.FRONTEND_ORIGIN
+    ? process.env.FRONTEND_ORIGIN.split(',').map((origin) => origin.trim())
+    : '*';
+
+app.use(cors({ origin: corsOrigin })); 
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 2. IMPORT ROUTES 
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'Laptop Shop API Docs',
+    customCss: '.swagger-ui .topbar { display: none }',
+}));
+
+
+
+
 const sliderRoutes = require('./routes/sliderRoutes');
-const blogCategoryRoutes = require('./routes/blogCategoryRoutes');
-// 3. Routes
+const productRoutes = require('./routes/productRoutes');
+const brandRoutes = require('./routes/brandRoutes');
+const productCategoryRoutes = require('./routes/productCategoryRoutes');
+const authRoutes = require('./routes/authRoutes');
+const authAdminRoutes = require('./routes/authAdminRoutes');
+const blogRoutes = require('./routes/blogRoutes');
+
+
 app.use('/api/sliders', sliderRoutes);
-app.use('/api/blog-categories', blogCategoryRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/auth/admin', authAdminRoutes);
+app.use('/api/blog', blogRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/product-categories', productCategoryRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Cho phép truy cập trực tiếp vào thư mục uploads qua URL
 app.use((req, res, next) => {
     res.status(404).json({ success: false, message: 'Đường dẫn API không tồn tại!' });
 });
 
-// 5. KHỞI ĐỘNG SERVER
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server đang chạy tại port ${PORT}`);
+    console.log(`📚 Swagger UI: http://localhost:${PORT}/api-docs`);
 });
