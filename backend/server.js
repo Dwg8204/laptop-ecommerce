@@ -30,12 +30,14 @@ const authRoutes = require('./routes/authRoutes');
 const authAdminRoutes = require('./routes/authAdminRoutes');
 const blogRoutes = require('./routes/blogRoutes');
 const blogCategoryRoutes = require('./routes/blogCategoryRoutes');
+const voucherRoutes = require('./routes/voucherRoutes');
 
 app.use('/api/sliders', sliderRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/admin', authAdminRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/blog-categories', blogCategoryRoutes);
+app.use('/api/vouchers', voucherRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/product-categories', productCategoryRoutes);
