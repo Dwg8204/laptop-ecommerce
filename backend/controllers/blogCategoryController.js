@@ -49,7 +49,7 @@ const blogCategoryController = {
             );
         } catch (error) {
             if(error.code === 'ER_DUP_ENTRY') {
-                res.status(409).json({ error: "Trùng tên danh mục, vui lòng chọn tên khác" });
+                return res.status(409).json({ error: "Trùng tên danh mục, vui lòng chọn tên khác" });
             }
             console.error('Error creating category:', error);
             res.status(500).json({ error: 'Failed to create category' });
@@ -76,7 +76,7 @@ const blogCategoryController = {
         }
         catch (error) {
             if(error.code === 'ER_DUP_ENTRY') {
-                res.status(409).json({ error: "Trùng tên danh mục, vui lòng chọn tên khác" });
+                return res.status(409).json({ error: "Trùng tên danh mục, vui lòng chọn tên khác" });
             }
             console.error('Error updating category:', error);
             res.status(500).json({ error: 'Failed to update category' });
