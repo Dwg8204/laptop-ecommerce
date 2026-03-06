@@ -12,9 +12,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // 2. IMPORT ROUTES 
 const sliderRoutes = require('./routes/sliderRoutes');
-
+const blogCategoryRoutes = require('./routes/blogCategoryRoutes');
 // 3. Routes
 app.use('/api/sliders', sliderRoutes);
+app.use('/api/blog-categories', blogCategoryRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Cho phép truy cập trực tiếp vào thư mục uploads qua URL
 app.use((req, res, next) => {
     res.status(404).json({ success: false, message: 'Đường dẫn API không tồn tại!' });
