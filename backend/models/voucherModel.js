@@ -60,7 +60,7 @@ const Voucher = {
             )
         ]);
 
-        // ✅ Dùng helper thay vì build thủ công
+        // Dùng helper để build response chuẩn cho pagination
         return buildPaginationResult(rows, countResult.total, page, limit);
     },
 
