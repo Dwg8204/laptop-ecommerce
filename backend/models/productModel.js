@@ -120,8 +120,7 @@ const Product = {
         const allowedSortFields = {
             'price': 'min_price',
             'name': 'p.product_name',
-            'created_at': 'p.created_at',
-            'sold_quantity': 'p.sold_quantity'
+            'created_at': 'p.created_at'
         };
         const { safeSortBy, safeSortOrder } = getSafeSort(options.sortBy, options.sortOrder, allowedSortFields, 'p.created_at');
         query += ` ORDER BY ${safeSortBy} ${safeSortOrder}`;
@@ -317,7 +316,7 @@ const Product = {
 
     /**
      * Thêm mới một sản phẩm vào cơ sở dữ liệu, bao gồm specs chung, variants và ảnh.
-     * @param {Object} productData - Dữ liệu của sản phẩm (product_name, brand_id, category_id, description_html, highlight_features, sold_quantity).
+     * @param {Object} productData - Dữ liệu của sản phẩm (product_name, brand_id, category_id, description_html, highlight_features).
      * @param {Object} specData - Dữ liệu thông số kỹ thuật chung (screen_size, weight_kg, os).
      * @param {Array<string>} productLevelImageUrls - Mảng các URL hình ảnh cấp sản phẩm.
      * @param {Array<Object>} variantsData - Mảng các đối tượng variant, mỗi đối tượng bao gồm data variant và imageUrls.
@@ -449,7 +448,7 @@ const Product = {
             let affectedTotalRows = 0;
 
             // 1. Cập nhật thông tin sản phẩm
-            const allowedProductFields = ['product_name', 'brand_id', 'category_id', 'description_html', 'highlight_features', 'sold_quantity'];
+            const allowedProductFields = ['product_name', 'brand_id', 'category_id', 'description_html', 'highlight_features'];
             const productFieldsToUpdate = [];
             const productValues = [];
 
