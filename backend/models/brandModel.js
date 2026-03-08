@@ -1,5 +1,22 @@
 const db = require('../config/db');
 
+// --- Helper Validation for Brand Data ---
+const validateBrandData = (data, isUpdate = false) => {
+    const { brand_name, logo_url } = data;
+    const errors = [];
+
+    if (!isUpdate) {
+        if (!brand_name?.trim()) errors.push('Tên thương hiệu không được để trống.');
+    }
+
+    if (brand_name !== undefined && !brand_name.trim()) {
+        errors.push('Tên thương hiệu không được để trống.');
+    }
+    // logo_url có thể null hoặc rỗng, không cần validate chặt chẽ về nội dung
+    
+    return errors;
+};
+
 const Brand = {
     /**
      * Lấy tất cả thương hiệu.
@@ -81,4 +98,7 @@ const Brand = {
     }
 };
 
-module.exports = Brand;
+module.exports = {
+    ...Brand, // Export tất cả các hàm của Brand
+    validateBrandData // Export thêm hàm validation
+};
