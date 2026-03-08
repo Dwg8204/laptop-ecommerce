@@ -131,3 +131,27 @@ CHANGE COLUMN product_id variant_id INT NOT NULL;
 ALTER TABLE import_receipt_details
 ADD CONSTRAINT fk_import_details_variant
     FOREIGN KEY (variant_id) REFERENCES product_variants(variant_id) ON DELETE RESTRICT;
+
+-- Sửa lỗi quan hệ của bảng sản phẩm
+ALTER TABLE product_images
+DROP FOREIGN KEY fk_images_variant;
+
+ALTER TABLE product_images
+DROP FOREIGN KEY product_images_ibfk_1;
+
+DROP INDEX uq_primary_per_product ON product_images;
+
+DROP INDEX uq_primary_per_variant ON product_images;
+ALTER TABLE products
+DROP COLUMN original_price,
+DROP COLUMN discount_price,
+DROP COLUMN stock_quantity,
+DROP COLUMN status;
+
+ALTER TABLE product_specifications
+DROP COLUMN ram_gb,
+DROP COLUMN ram_type,
+DROP COLUMN storage_gb;
+
+ALTER TABLE product_variants
+ADD COLUMN ram_type VARCHAR(50);

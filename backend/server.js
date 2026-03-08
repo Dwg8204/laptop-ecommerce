@@ -31,6 +31,7 @@ const authAdminRoutes = require('./routes/authAdminRoutes');
 const blogRoutes = require('./routes/blogRoutes');
 const blogCategoryRoutes = require('./routes/blogCategoryRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
 
 app.use('/api/sliders', sliderRoutes);
 app.use('/api/auth', authRoutes);
@@ -41,6 +42,7 @@ app.use('/api/vouchers', voucherRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/product-categories', productCategoryRoutes);
+app.use('/api/inventory', inventoryRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Cho phép truy cập trực tiếp vào thư mục uploads qua URL
 app.use((req, res, next) => {
     res.status(404).json({ success: false, message: 'Đường dẫn API không tồn tại!' });
