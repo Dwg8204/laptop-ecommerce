@@ -91,13 +91,13 @@ const productController = {
     createProduct: async (req, res) => {
         try {
             const {
-                product_name, brand_id, category_id, description_html, highlight_features, sold_quantity,
+                product_name, brand_id, category_id, description_html, highlight_features,
                 screen_size, weight_kg, os,
                 variants: variantsString
             } = req.body;
 
             // 1. Validate Product Data
-            const productErrors = validateProductData({ product_name, brand_id, category_id, description_html, highlight_features, sold_quantity });
+            const productErrors = validateProductData({ product_name, brand_id, category_id, description_html, highlight_features });
             if (productErrors.length > 0) {
                 return res.status(400).json({ success: false, message: 'Lỗi dữ liệu sản phẩm', errors: productErrors });
             }
@@ -165,8 +165,7 @@ const productController = {
                 brand_id: parseInt(brand_id),
                 category_id: parseInt(category_id),
                 description_html: description_html || null,
-                highlight_features: highlight_features || null,
-                sold_quantity: sold_quantity ? parseInt(sold_quantity) : 0
+                highlight_features: highlight_features || null
             };
 
             const specData = {
@@ -226,7 +225,7 @@ const productController = {
             }
 
             const {
-                product_name, brand_id, category_id, description_html, highlight_features, sold_quantity,
+                product_name, brand_id, category_id, description_html, highlight_features,
                 screen_size, weight_kg, os,
                 delete_image_ids: deleteImageIdsString,
                 primary_product_image_id,
@@ -235,7 +234,7 @@ const productController = {
             } = req.body;
 
             // 1. Validate Product Data
-            const productErrors = validateProductData({ product_name, brand_id, category_id, description_html, highlight_features, sold_quantity }, true);
+            const productErrors = validateProductData({ product_name, brand_id, category_id, description_html, highlight_features }, true);
             if (productErrors.length > 0) {
                 return res.status(400).json({ success: false, message: 'Lỗi dữ liệu sản phẩm', errors: productErrors });
             }
@@ -272,8 +271,7 @@ const productController = {
                 brand_id: brand_id ? parseInt(brand_id) : undefined,
                 category_id: category_id ? parseInt(category_id) : undefined,
                 description_html,
-                highlight_features,
-                sold_quantity: sold_quantity ? parseInt(sold_quantity) : undefined
+                highlight_features
             };
 
             const specData = {
