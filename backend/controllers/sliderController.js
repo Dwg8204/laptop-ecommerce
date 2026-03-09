@@ -1,5 +1,18 @@
 const Slider = require('../models/sliderModel');
 
+const resolveUploadedImageUrl = (file) => {
+    if (!file) return '';
+
+    // Cloudinary thường trả URL ở file.path hoặc file.url
+    if (file.path && /^https?:\/\//i.test(file.path)) return file.path;
+    if (file.url && /^https?:\/\//i.test(file.url)) return file.url;
+
+    // Fallback local disk storage -> public URL qua /uploads
+    if (file.filename) return `/uploads/sliders/${file.filename}`;
+
+    return file.path || '';
+};
+
 const sliderController = {
     // API Lấy danh sách Slider (GET)
     getAllSliders: async (req, res) => {
@@ -39,32 +52,38 @@ const sliderController = {
     // API Thêm mới Slider (POST)
     createSlider: async (req, res) => {
         try {
-            const { title, link_url, display_order, status } = req.body;
+            const { title, link_url, display_order, status, image_url } = req.body;
             
-            // req.file chính là file ảnh mà multer vừa lưu xong
-            if (!req.file) {
-                return res.status(400).json({ success: false, message: 'Vui lòng upload ảnh banner!' });
+            let finalImageUrl;
+            
+            // Ưu tiên file upload, nếu không có thì dùng URL từ form
+            if (req.file) {
+                finalImageUrl = resolveUploadedImageUrl(req.file);
+            } else if (image_url && image_url.trim()) {
+                finalImageUrl = image_url.trim(); // URL nhập tay
+            } else {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Vui lòng upload ảnh hoặc nhập URL ảnh!' 
+                });
             }
 
-            // Tạo đường dẫn URL cho ảnh (Ví dụ: /uploads/sliders/image-12345.jpg)
-            // const image_url = `/uploads/sliders/${req.file.filename}`;
-            const image_url = req.file.path; // Đây là URL trả về từ Cloudinary sau khi upload thành công
-            // Tạo cục data để gửi cho Model
+            // Tạo dữ liệu slider
             const sliderData = {
                 title,
-                image_url, // Gắn cái URL vừa tạo vào Database
+                image_url: finalImageUrl,
                 link_url,
                 display_order,
                 status,
                 creator_id: null // Tạm thời để null vì chưa làm đăng nhập Admin
             };
 
-            const newId = await Slider.create(sliderData); // Gọi hàm ở file Model (không cần sửa file Model)
+            const newId = await Slider.create(sliderData);
 
             res.status(201).json({ 
                 success: true, 
-                message: 'Thêm Slider và upload ảnh thành công!',
-                data: { id: newId, image_url }
+                message: 'Thêm Slider thành công!',
+                data: { id: newId, image_url: finalImageUrl }
             });
         } catch (error) {
             console.error(error);
@@ -80,10 +99,16 @@ const sliderController = {
             if (!existingSlider) {
                 return res.status(404).json({ success: false, message: 'Slider không tồn tại!' });
             }
+            
             const updateData = { ...req.body };
+            
+            // Ưu tiên file upload, nếu không có thì kiểm tra image_url từ form
             if (req.file) {
-                updateData.image_url = req.file.path; // Cập nhật URL mới nếu có upload ảnh mới
+                updateData.image_url = resolveUploadedImageUrl(req.file);
+            } else if (req.body.image_url && req.body.image_url.trim()) {
+                updateData.image_url = req.body.image_url.trim(); // URL nhập tay
             }
+            
             const affectedRows = await Slider.update(id, updateData);
             if (affectedRows === 0) {
                 return res.status(400).json({ success: false, message: 'Không có trường nào được cập nhật!' });

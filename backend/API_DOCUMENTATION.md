@@ -290,6 +290,222 @@ Trả về tất cả bài viết PUBLISHED thuộc danh mục đó.
 
 ---
 
+## 📦 Brand APIs - Quản lý Thương hiệu
+
+### 11. **GET /api/brands** - Lấy danh sách thương hiệu
+
+#### Bước test:
+1. Mở Swagger UI tại `http://localhost:5000/api-docs`
+2. Tìm section **Brands**
+3. Click vào endpoint **GET /api/brands**
+4. Click nút **"Try it out"**
+5. Click nút **"Execute"**
+6. Xem kết quả ở phần **Response body**
+
+#### Kết quả mong đợi:
+```json
+{
+  "success": true,
+  "message": "Lấy danh sách thương hiệu thành công",
+  "data": [
+    {
+      "brand_id": 1,
+      "brand_name": "ASUS",
+      "logo_url": "https://example.com/asus-logo.png",
+      "product_count": 15
+    },
+    {
+      "brand_id": 2,
+      "brand_name": "Dell",
+      "logo_url": "https://example.com/dell-logo.png",
+      "product_count": 8
+    }
+  ]
+}
+```
+
+---
+
+### 12. **POST /api/brands** - Tạo thương hiệu mới
+
+#### Bước test:
+1. Mở Swagger UI
+2. Tìm section **Brands**
+3. Click vào endpoint **POST /api/brands**
+4. Click nút **"Try it out"**
+5. Nhập Request body:
+
+```json
+{
+  "brand_name": "MSI",
+  "logo_url": "https://example.com/msi-logo.png"
+}
+```
+
+6. Click nút **"Execute"**
+
+#### Kết quả mong đợi:
+```json
+{
+  "success": true,
+  "message": "Thêm thương hiệu thành công!",
+  "data": {
+    "brand_id": 3,
+    "brand_name": "MSI",
+    "logo_url": "https://example.com/msi-logo.png"
+  }
+}
+```
+
+**Lưu ý**: Nếu tên thương hiệu đã tồn tại, API sẽ trả về lỗi 409:
+```json
+{
+  "success": false,
+  "message": "Tên thương hiệu đã tồn tại."
+}
+```
+
+---
+
+### 13. **GET /api/brands/{id}** - Xem chi tiết thương hiệu
+
+#### Bước test:
+1. Mở Swagger UI
+2. Tìm endpoint **GET /api/brands/{id}**
+3. Click nút **"Try it out"**
+4. Nhập `id` của thương hiệu (ví dụ: 1)
+5. Click nút **"Execute"**
+
+#### Kết quả mong đợi:
+```json
+{
+  "success": true,
+  "message": "Lấy chi tiết thương hiệu thành công",
+  "data": {
+    "brand_id": 1,
+    "brand_name": "ASUS",
+    "logo_url": "https://example.com/asus-logo.png",
+    "product_count": 15
+  }
+}
+```
+
+---
+
+### 14. **PUT /api/brands/{id}** - Cập nhật thương hiệu
+
+#### Bước test:
+1. Mở Swagger UI
+2. Tìm endpoint **PUT /api/brands/{id}**
+3. Click nút **"Try it out"**
+4. Nhập `id` của thương hiệu (ví dụ: 1)
+5. Nhập Request body (cập nhật tên hoặc logo):
+
+```json
+{
+  "brand_name": "ASUS ROG",
+  "logo_url": "https://example.com/asus-rog-logo.png"
+}
+```
+
+6. Click nút **"Execute"**
+
+#### Kết quả mong đợi:
+```json
+{
+  "success": true,
+  "message": "Cập nhật thương hiệu thành công!"
+}
+```
+
+---
+
+### 15. **DELETE /api/brands/{id}** - Xóa thương hiệu
+
+#### Bước test:
+1. Mở Swagger UI
+2. Tìm endpoint **DELETE /api/brands/{id}**
+3. Click nút **"Try it out"**
+4. Nhập `id` của thương hiệu cần xóa
+5. Click nút **"Execute"**
+
+#### Kết quả mong đợi (thành công):
+```json
+{
+  "success": true,
+  "message": "Xóa thương hiệu thành công!"
+}
+```
+
+#### Kết quả nếu thương hiệu đang được sử dụng:
+```json
+{
+  "success": false,
+  "message": "Không thể xóa thương hiệu này vì có sản phẩm đang sử dụng nó."
+}
+```
+
+**Lưu ý**: Không thể xóa thương hiệu nếu có sản phẩm nào đang tham chiếu đến nó.
+
+---
+
+## 🎯 Workflow Test Product APIs từ đầu đến cuối
+
+### Kịch bản: Tạo sản phẩm hoàn chỉnh
+
+#### Bước 1: Tạo/Kiểm tra Brand và Category
+```bash
+# Lấy danh sách thương hiệu
+GET /api/brands
+
+# Lấy danh sách danh mục
+GET /api/product-categories
+
+# Nếu chưa có, tạo mới:
+POST /api/brands
+{
+  "brand_name": "ASUS"
+}
+
+POST /api/product-categories
+{
+  "category_name": "Laptop Gaming",
+  "parent_category_id": null
+}
+```
+
+#### Bước 2: Lưu lại brand_id và category_id vừa tạo (ví dụ: brand_id=1, category_id=2)
+
+#### Bước 3: Tạo sản phẩm với variants
+```bash
+POST /api/products
+# Content-Type: multipart/form-data
+# Fields:
+- product_name: "ASUS ROG Strix G16"
+- brand_id: 1
+- category_id: 2
+- description_html: "<p>Laptop gaming cao cấp</p>"
+- highlight_features: "Màn hình 165Hz, RTX 4060"
+- screen_size: 16
+- weight_kg: 2.3
+- os: "Windows 11"
+- variants: '[{"sku":"ROG-G16-16-512","ram_gb":16,"storage_gb":512,"color_name":"Black","original_price":25990000,"stock_quantity":10}]'
+- productImages: [file ảnh sản phẩm]
+- variant_0_images: [file ảnh variant đầu tiên]
+```
+
+#### Bước 4: Lấy danh sách sản phẩm để kiểm tra
+```bash
+GET /api/products?page=1&limit=12
+```
+
+#### Bước 5: Xem chi tiết sản phẩm vừa tạo
+```bash
+GET /api/products/{productId}
+```
+
+---
+
 ## �📁 Cấu trúc file OpenAPI
 
 ### 1. **config/swagger.js**
@@ -411,6 +627,54 @@ BlogPost:
     author_name:
       type: string
       description: Tên tác giả
+```
+
+#### **Brand Schema**
+```yaml
+Brand:
+  type: object
+  required:
+    - brand_name
+  properties:
+    brand_id:
+      type: integer
+      description: ID thương hiệu
+      example: 1
+    brand_name:
+      type: string
+      description: Tên thương hiệu
+      example: ASUS
+    logo_url:
+      type: string
+      nullable: true
+      description: URL logo thương hiệu
+      example: https://example.com/asus-logo.png
+    product_count:
+      type: integer
+      description: Số lượng sản phẩm của thương hiệu
+      example: 15
+```
+
+#### **ProductCategory Schema**
+```yaml
+ProductCategory:
+  type: object
+  required:
+    - category_name
+  properties:
+    category_id:
+      type: integer
+      description: ID danh mục sản phẩm
+      example: 1
+    category_name:
+      type: string
+      description: Tên danh mục
+      example: Laptop Gaming
+    parent_category_id:
+      type: integer
+      nullable: true
+      description: ID danh mục cha
+      example: null
 ```
 
 ---

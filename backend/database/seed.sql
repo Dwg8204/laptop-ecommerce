@@ -39,8 +39,8 @@ ON DUPLICATE KEY UPDATE category_name = VALUES(category_name);
 
 -- Insert sample admin user (password: admin123)
 -- Password hash cho 'admin123' với bcrypt salt rounds = 10
-INSERT INTO users (email, password_hash, full_name, phone_number, status, is_email_verified) VALUES
-('admin@laptop-shop.com', '$2b$10$rZ7Yx5J5J5J5J5J5J5J5J5uXXXXXXXXXXXXXXXXXXXXXXXXXXX', 'Admin System', '0900000000', 'ACTIVE', TRUE)
+INSERT INTO users (email, password_hash, full_name, phone_number, status) VALUES
+('admin@laptop-shop.com', '$2b$10$rZ7Yx5J5J5J5J5J5J5J5J5uXXXXXXXXXXXXXXXXXXXXXXXXXXX', 'Admin System', '0900000000', 'ACTIVE')
 ON DUPLICATE KEY UPDATE email = VALUES(email);
 
 -- Gán role ADMIN cho user admin (user_id = 1, role_id = 1)

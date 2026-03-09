@@ -79,6 +79,35 @@
   text-align: left;
 }
 
+.auth-notice {
+  padding: 10px;
+  background: #eef8ee;
+  border: 1px solid #b8dfb8;
+  border-radius: 6px;
+  color: #1f6d1f;
+  font-size: 14px;
+  text-align: left;
+}
+
+.auth-fb-btn {
+  background: #1877f2;
+}
+
+.auth-forgot {
+  background: none;
+  border: none;
+  color: #1877f2;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+
+.auth-forgot-submit {
+  background: #111;
+  font-size: 14px;
+}
+
 .auth-demo {
   margin-top: 15px;
   padding: 12px;

@@ -1,6 +1,54 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import "../styles/HomeArticleSection.css"
 
 export default function HomeArticleSection() {
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
+  const getImageUrl = (thumbnailUrl) => {
+    if (!thumbnailUrl) return 'https://via.placeholder.com/300x200?text=Không+có+ảnh';
+    
+    // Nếu là URL đầy đủ (bắt đầu bằng http)
+    if (thumbnailUrl.startsWith('http')) {
+      return thumbnailUrl;
+    }
+    
+    // Nếu là đường dẫn tương đối
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    return `${apiUrl}${thumbnailUrl}`;
+  };
+
+  useEffect(() => {
+    fetchPublishedPosts();
+  }, []);
+
+  const fetchPublishedPosts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/blog/posts/published?limit=7`);
+      
+      if (!response.ok) {
+        throw new Error('Lỗi khi lấy bài viết');
+      }
+      
+      const data = await response.json();
+      console.log('Blog posts data:', data);
+      
+      if (data.success && data.data) {
+        setArticles(data.data);
+      }
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching posts:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="home-article-wrapper">
       
@@ -63,45 +111,37 @@ export default function HomeArticleSection() {
           <span className="view-all">Xem tất cả</span>
         </div>
 
-        <div className="news-item">
-          <img src="https://cdn-media.sforum.vn/storage/app/media/thongvo/tren-tay-asus-rog-strix-g16-g614p/tren-tay-asus-rog-strix-g16-g614p-cover.jpg" alt="news" />
-          <p>Trên tay ROG Strix G16: Chi 40 triệu cho cấu hình RTX 5050...</p>
-        </div>
-
-        <div className="news-item">
-          <img src="https://cdn-media.sforum.vn/storage/app/media/thanhhieu/laptop-hoc-tap-dip-dau-nam-moi-2026/laptop-hoc-tap-dip-dau-nam-moi-2026-cover.jpg" alt="news" />
-          <p>Hết Tết rủng rỉnh ví: Điểm danh 5 laptop học tập...</p>
-        </div>
-
-        <div className="news-item">
-          <img src="https://cdn-media.sforum.vn/storage/app/media/trannghia/trannghia/1/khuyen-mai-game-khi-mua-laptop.jpg" alt="news" />
-          <p>Mua laptop/PC ROG & TUF Gaming với GPU RTX 50 Series...</p>
-        </div>
-        
-        <div className="news-item">
-          <img src="https://cdn-media.sforum.vn/storage/app/media/trannghia/trannghia/1/mua-laptop-amd-tang-game.jpg" alt="news" />
-          <p>Mua laptop/PC ROG & TUF Gaming với GPU RTX 50 Series...</p>
-        </div>
-        
-        <div className="news-item">
-          <img src="https://cdn-media.sforum.vn/storage/app/media/thongvo/danh-gia-asus-experbook-p1403cva/danh-gia-asus-expertbook-p1403cva-cover.jpg" alt="news" />
-          <p>Đánh giá ASUS ExperBook P1403CVA: Laptop cho sinh viên...</p>
-        </div>
-
-        <div className="news-item">
-          <img src="https://cdn-media.sforum.vn/storage/app/media/thongvo/tren-tay-asus-rog-strix-g16-g614p/tren-tay-asus-rog-strix-g16-g614p-cover.jpg" alt="news" />
-          <p>Laptop gaming giá tốt: Cách chọn máy chạy game mượt...</p>
-        </div>
-
-        <div className="news-item">
-          <img src="https://cdn-media.sforum.vn/storage/app/media/thanhhieu/laptop-hoc-tap-dip-dau-nam-moi-2026/laptop-hoc-tap-dip-dau-nam-moi-2026-cover.jpg" alt="news" />
-          <p>MacBook Pro 14 inch 2024: Hiệu năng vượt trội cho công việc...</p>
-        </div>
-
-        <div className="news-item">
-          <img src="https://cdn-media.sforum.vn/storage/app/media/trannghia/trannghia/1/khuyen-mai-game-khi-mua-laptop.jpg" alt="news" />
-          <p>Dell XPS 13: Laptop mỏng nhẹ cao cấp cho chuyên gia...</p>
-        </div>
+        {loading ? (
+          <div className="news-loading">
+            <p>Đang tải tin tức...</p>
+          </div>
+        ) : error ? (
+          <div className="news-error">
+            <p>Lỗi: {error}</p>
+          </div>
+        ) : articles.length > 0 ? (
+          articles.map((article) => (
+            <div 
+              key={article.post_id} 
+              className="news-item"
+              onClick={() => navigate(`/news/${article.post_id}`)}
+              style={{ cursor: 'pointer' }}
+            >
+              <img 
+                src={getImageUrl(article.thumbnail_url)} 
+                alt={article.title} 
+                onError={(e) => {
+                  e.target.src = 'https://via.placeholder.com/300x200?text=Lỗi+ảnh'
+                }}
+              />
+              <p>{article.title}</p>
+            </div>
+          ))
+        ) : (
+          <div className="news-empty">
+            <p>Không có bài viết nào</p>
+          </div>
+        )}
       </div>
 
     </div>

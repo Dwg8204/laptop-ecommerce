@@ -1,5 +1,23 @@
 const db = require('../config/db');
 
+const validateProductCategoryData = (data, isUpdate = false) => {
+    const { category_name, parent_category_id } = data;
+    const errors = [];
+
+    if (!isUpdate) {
+        if (!category_name?.trim()) errors.push('Tên danh mục sản phẩm không được để trống.');
+    }
+
+    if (category_name !== undefined && !category_name.trim()) {
+        errors.push('Tên danh mục sản phẩm không được để trống.');
+    }
+    if (parent_category_id !== undefined && parent_category_id !== null && (isNaN(parseInt(parent_category_id)) || parseInt(parent_category_id) <= 0)) {
+        errors.push('ID danh mục cha không hợp lệ.');
+    }
+    
+    return errors;
+};
+
 const ProductCategory = {
     /**
      * Lấy tất cả danh mục.
@@ -119,4 +137,7 @@ const ProductCategory = {
     }
 };
 
-module.exports = ProductCategory;
+module.exports = {
+    ...ProductCategory,
+    validateProductCategoryData
+};

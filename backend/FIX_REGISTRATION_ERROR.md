@@ -290,7 +290,6 @@ mysql -u root -p < backend/database/seed.sql
       "full_name": "Test User",
       "phone_number": "0901234567",
       "status": "ACTIVE",
-      "is_email_verified": false,
       "created_at": "2026-03-03T..."
     },
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."

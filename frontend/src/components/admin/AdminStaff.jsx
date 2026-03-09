@@ -14,11 +14,17 @@ export default function AdminStaff({
           <input placeholder="Họ tên" value={newStaff.name} onChange={(event) => setNewStaff((prev) => ({ ...prev, name: event.target.value }))} required />
           <input placeholder="Số điện thoại" value={newStaff.phone} onChange={(event) => setNewStaff((prev) => ({ ...prev, phone: event.target.value }))} required />
           <input type="password" placeholder="Mật khẩu" value={newStaff.password} onChange={(event) => setNewStaff((prev) => ({ ...prev, password: event.target.value }))} required />
-          <input type="email" placeholder="Email" value={newStaff.email} onChange={(event) => setNewStaff((prev) => ({ ...prev, email: event.target.value }))} required />
+          <input
+            type="email"
+            placeholder="Email"
+            value={newStaff.email}
+            onChange={(event) => setNewStaff((prev) => ({ ...prev, email: event.target.value }))}
+            pattern={'^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$'}
+            title="Email phải đúng định dạng, ví dụ: user@example.com"
+            required
+          />
           <select value={newStaff.role} onChange={(event) => setNewStaff((prev) => ({ ...prev, role: event.target.value }))}>
-            <option value="support">CSKH</option>
-            <option value="sales">Bán hàng</option>
-            <option value="warehouse">Kho</option>
+            <option value="staff">Nhân viên</option>
             <option value="admin">Admin</option>
           </select>
           <button className="adm-btn adm-btn-primary" type="submit">Tạo</button>

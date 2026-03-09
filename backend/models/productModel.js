@@ -1,4 +1,6 @@
 const db = require('../config/db');
+const { getSafeSort } = require('../helpers/queryHelper');
+const { VALID_STATUSES } = require('../helpers/productValidationHelper');
 
 const Product = {
     /**
@@ -17,25 +19,58 @@ const Product = {
      */
     getAll: async (options = {}) => {
         let query = `
-            SELECT 
-                p.product_id, 
-                p.product_name, 
-                p.original_price, 
-                p.discount_price, 
-                p.stock_quantity, 
-                p.status,
+            SELECT
+                p.product_id,
+                p.product_name,
+                p.description_html,
+                p.highlight_features,
                 b.brand_name,
                 c.category_name,
-                s.cpu_name,         
-                s.gpu,              
-                s.ram_gb,           
-                s.storage_gb,       
-                s.screen_size,
-                (SELECT image_url FROM product_images WHERE product_id = p.product_id AND is_primary = TRUE LIMIT 1) AS primary_image_url
+                ps.screen_size,
+                ps.weight_kg,
+                ps.os,
+                MIN(CASE WHEN pv.discount_price IS NOT NULL THEN pv.discount_price ELSE pv.original_price END) AS min_price,
+                MAX(CASE WHEN pv.discount_price IS NOT NULL THEN pv.discount_price ELSE pv.original_price END) AS max_price,
+                SUM(pv.stock_quantity) AS total_stock_quantity,
+                (
+                    SELECT image_url
+                    FROM product_images
+                    WHERE product_id = p.product_id AND variant_id IS NULL AND is_primary = TRUE
+                    LIMIT 1
+                ) AS primary_product_image_url,
+                (
+                    SELECT pv2.cpu_name
+                    FROM product_variants pv2
+                    WHERE pv2.product_id = p.product_id
+                    ORDER BY (pv2.discount_price IS NULL), pv2.discount_price, pv2.original_price ASC
+                    LIMIT 1
+                ) AS representative_cpu_name,
+                (
+                    SELECT pv3.gpu
+                    FROM product_variants pv3
+                    WHERE pv3.product_id = p.product_id
+                    ORDER BY (pv3.discount_price IS NULL), pv3.discount_price, pv3.original_price ASC
+                    LIMIT 1
+                ) AS representative_gpu,
+                (
+                    SELECT pv4.ram_gb
+                    FROM product_variants pv4
+                    WHERE pv4.product_id = p.product_id
+                    ORDER BY (pv4.discount_price IS NULL), pv4.discount_price, pv4.original_price ASC
+                    LIMIT 1
+                ) AS representative_ram_gb,
+                (
+                    SELECT pv5.storage_gb
+                    FROM product_variants pv5
+                    WHERE pv5.product_id = p.product_id
+                    ORDER BY (pv5.discount_price IS NULL), pv5.discount_price, pv5.original_price ASC
+                    LIMIT 1
+                ) AS representative_storage_gb
             FROM products p
             LEFT JOIN brands b ON p.brand_id = b.brand_id
             LEFT JOIN categories c ON p.category_id = c.category_id
-            LEFT JOIN product_specifications s ON p.product_id = s.product_id 
+            LEFT JOIN product_specifications ps ON p.product_id = ps.product_id
+            LEFT JOIN product_variants pv ON p.product_id = pv.product_id
             WHERE 1=1
         `;
         const values = [];
@@ -57,49 +92,46 @@ const Product = {
             query += ` AND p.brand_id = ?`;
             values.push(options.brandId);
         }
+        
+        // Lọc theo trạng thái (ít nhất một variant có trạng thái này)
+        if (options.status && VALID_STATUSES.includes(options.status.toUpperCase())) {
+            query += ` AND pv.status = ?`;
+            values.push(options.status.toUpperCase());
+        }
 
-        // Lọc theo giá
+        query += ` GROUP BY p.product_id`; // Group lại để tính MIN/MAX/SUM
+
+        // Lọc theo giá (sau GROUP BY) - Cần HAVING
         if (options.minPrice) {
-            query += ` AND p.discount_price >= ?`; // Hoặc original_price tùy logic
+            query += ` HAVING min_price >= ?`;
             values.push(options.minPrice);
         }
         if (options.maxPrice) {
-            query += ` AND p.discount_price <= ?`; // Hoặc original_price tùy logic
+            // Nếu đã có HAVING, dùng AND
+            if (options.minPrice) {
+                 query += ` AND max_price <= ?`;
+            } else {
+                 query += ` HAVING max_price <= ?`;
+            }
             values.push(options.maxPrice);
         }
 
-        // Sắp xếp
-        if (options.sortBy) {
-            let orderByField = '';
-            switch (options.sortBy) {
-                case 'price':
-                    orderByField = 'p.discount_price IS NULL, p.discount_price, p.original_price'; // Ưu tiên discount_price nếu có
-                    break;
-                case 'name':
-                    orderByField = 'p.product_name';
-                    break;
-                case 'created_at':
-                    orderByField = 'p.created_at';
-                    break;
-                // Có thể thêm các trường sắp xếp khác như 'views', 'sales'
-                default:
-                    orderByField = 'p.created_at'; // Mặc định sắp xếp theo ngày tạo
-            }
-            const sortOrder = options.sortOrder && ['ASC', 'DESC'].includes(options.sortOrder.toUpperCase()) 
-                                ? options.sortOrder.toUpperCase() 
-                                : 'DESC'; // Mặc định giảm dần
-            query += ` ORDER BY ${orderByField} ${sortOrder}`;
-        } else {
-            query += ` ORDER BY p.created_at DESC`; // Mặc định sắp xếp theo ngày tạo mới nhất
-        }
+        // Sắp xếp an toàn
+        const allowedSortFields = {
+            'price': 'min_price',
+            'name': 'p.product_name',
+            'created_at': 'p.created_at'
+        };
+        const { safeSortBy, safeSortOrder } = getSafeSort(options.sortBy, options.sortOrder, allowedSortFields, 'p.created_at');
+        query += ` ORDER BY ${safeSortBy} ${safeSortOrder}`;
 
         // Phân trang
         if (options.limit) {
             query += ` LIMIT ?`;
-            values.push(parseInt(options.limit));
+            values.push(options.limit);
             if (options.offset) {
                 query += ` OFFSET ?`;
-                values.push(parseInt(options.offset));
+                values.push(options.offset);
             }
         }
 
@@ -114,10 +146,11 @@ const Product = {
      */
     getTotalCount: async (options = {}) => {
         let query = `
-            SELECT COUNT(p.product_id) AS total_count
+            SELECT COUNT(DISTINCT p.product_id) AS total_count
             FROM products p
             LEFT JOIN brands b ON p.brand_id = b.brand_id
             LEFT JOIN categories c ON p.category_id = c.category_id
+            LEFT JOIN product_variants pv ON p.product_id = pv.product_id
             WHERE 1=1
         `;
         const values = [];
@@ -134,39 +167,87 @@ const Product = {
             query += ` AND p.brand_id = ?`;
             values.push(options.brandId);
         }
-        if (options.minPrice) {
-            query += ` AND p.discount_price >= ?`;
-            values.push(options.minPrice);
-        }
-        if (options.maxPrice) {
-            query += ` AND p.discount_price <= ?`;
-            values.push(options.maxPrice);
+        if (options.status && VALID_STATUSES.includes(options.status.toUpperCase())) {
+            query += ` AND pv.status = ?`;
+            values.push(options.status.toUpperCase());
         }
 
-        const [rows] = await db.query(query, values);
-        return rows[0].total_count;
+        // Cần GROUP BY và HAVING cho totalCount nếu lọc giá được áp dụng.
+        // Đơn giản cho lọc giá
+        if (options.minPrice || options.maxPrice) {
+            let subQuery = `
+                SELECT p.product_id, MIN(CASE WHEN pv.discount_price IS NOT NULL THEN pv.discount_price ELSE pv.original_price END) AS min_price,
+                MAX(CASE WHEN pv.discount_price IS NOT NULL THEN pv.discount_price ELSE pv.original_price END) AS max_price
+                FROM products p
+                LEFT JOIN brands b ON p.brand_id = b.brand_id
+                LEFT JOIN categories c ON p.category_id = c.category_id
+                LEFT JOIN product_variants pv ON p.product_id = pv.product_id
+                WHERE 1=1
+                ${options.search ? ` AND p.product_name LIKE ?` : ''}
+                ${options.categoryId ? ` AND p.category_id = ?` : ''}
+                ${options.brandId ? ` AND p.brand_id = ?` : ''}
+                ${options.status && VALID_STATUSES.includes(options.status.toUpperCase()) ? ` AND pv.status = ?` : ''}
+                GROUP BY p.product_id
+            `;
+            const subQueryValues = [];
+            if (options.search) subQueryValues.push(`%${options.search}%`);
+            if (options.categoryId) subQueryValues.push(options.categoryId);
+            if (options.brandId) subQueryValues.push(options.brandId);
+            if (options.status && VALID_STATUSES.includes(options.status.toUpperCase())) subQueryValues.push(options.status.toUpperCase());
+
+            let havingClause = '';
+            if (options.minPrice) {
+                havingClause += ` HAVING min_price >= ?`;
+                subQueryValues.push(options.minPrice);
+            }
+            if (options.maxPrice) {
+                if (options.minPrice) {
+                    havingClause += ` AND max_price <= ?`;
+                } else {
+                    havingClause += ` HAVING max_price <= ?`;
+                }
+                subQueryValues.push(options.maxPrice);
+            }
+            
+            query = `SELECT COUNT(*) AS total_count FROM (${subQuery} ${havingClause}) AS filtered_products`;
+            const [rows] = await db.query(query, subQueryValues);
+            return rows[0].total_count;
+
+        } else {
+            // Nếu không có lọc giá, dùng truy vấn đơn giản hơn
+            const [rows] = await db.query(query, values);
+            return rows[0].total_count;
+        }
     },
 
 
     /**
-     * Lấy thông tin chi tiết một sản phẩm theo ID, bao gồm thông số kỹ thuật, hình ảnh, hãng, danh mục VÀ ĐÁNH GIÁ SẢN PHẨM.
+     * Lấy thông tin chi tiết một sản phẩm theo ID, bao gồm thông số kỹ thuật chung,
+     * tất cả các phiên bản (variants) của sản phẩm đó cùng với ảnh, và đánh giá.
      * @param {number} id - ID của sản phẩm.
      * @returns {Promise<Object|null>} Đối tượng sản phẩm hoặc null nếu không tìm thấy.
      */
     getById: async (id) => {
-        const query = `
-            SELECT 
-                p.*, 
-                b.brand_name, 
+        // 1. Lấy thông tin sản phẩm chính, hãng, danh mục, specs chung và highlight features
+        const productQuery = `
+            SELECT
+                p.product_id,
+                p.product_name,
+                p.description_html,
+                p.highlight_features,
+                p.created_at,
+                b.brand_name,
                 c.category_name,
-                s.cpu_name, s.cpu_benchmark_score, s.ram_gb, s.ram_type, s.storage_gb, s.gpu, s.screen_size, s.weight_kg, s.os
+                ps.screen_size,     -- Từ product_specifications
+                ps.weight_kg,       -- Từ product_specifications
+                ps.os               -- Từ product_specifications
             FROM products p
             LEFT JOIN brands b ON p.brand_id = b.brand_id
             LEFT JOIN categories c ON p.category_id = c.category_id
-            LEFT JOIN product_specifications s ON p.product_id = s.product_id
+            LEFT JOIN product_specifications ps ON p.product_id = ps.product_id
             WHERE p.product_id = ?
         `;
-        const [productRows] = await db.query(query, [id]);
+        const [productRows] = await db.query(productQuery, [id]);
 
         if (productRows.length === 0) {
             return null; // Sản phẩm không tồn tại
@@ -174,23 +255,58 @@ const Product = {
 
         const product = productRows[0];
 
-        // Lấy danh sách hình ảnh
-        const [imageRows] = await db.query('SELECT image_id, image_url, is_primary FROM product_images WHERE product_id = ?', [id]);
-        product.images = imageRows;
+        // 2. Lấy tất cả ảnh cấp sản phẩm (variant_id IS NULL)
+        const [productImages] = await db.query(
+            'SELECT image_id, image_url, is_primary FROM product_images WHERE product_id = ? AND variant_id IS NULL ORDER BY is_primary DESC, image_id ASC',
+            [id]
+        );
+        product.images = productImages;
 
-        // 3. Lấy danh sách đánh giá của sản phẩm, bao gồm tên người dùng
+        // 3. Lấy tất cả các phiên bản (variants) của sản phẩm
+        const [variants] = await db.query(
+            `SELECT
+                pv.variant_id,
+                pv.sku,
+                pv.cpu_name,
+                pv.cpu_benchmark_score,
+                pv.gpu,
+                pv.ram_gb,
+                pv.storage_gb,
+                pv.color_name,
+                pv.original_price,
+                pv.discount_price,
+                pv.stock_quantity,
+                pv.status
+            FROM product_variants pv
+            WHERE pv.product_id = ?
+            ORDER BY pv.color_name ASC, pv.ram_gb ASC, pv.storage_gb ASC`,
+            [id]
+        );
+
+        // 4. Với mỗi variant, lấy các ảnh liên quan
+        for (const variant of variants) {
+            const [variantImages] = await db.query(
+                'SELECT image_id, image_url, is_primary FROM product_images WHERE variant_id = ? ORDER BY is_primary DESC, image_id ASC',
+                [variant.variant_id]
+            );
+            variant.images = variantImages;
+        }
+        product.variants = variants;
+
+
+        // 5. Lấy danh sách đánh giá của sản phẩm, bao gồm tên người dùng
         const [reviewRows] = await db.query(
-            `SELECT 
-                pr.review_id, 
-                pr.user_id, 
-                u.full_name AS reviewer_name, 
-                pr.rating, 
-                pr.content, 
+            `SELECT
+                pr.review_id,
+                pr.user_id,
+                u.full_name AS reviewer_name,
+                pr.rating,
+                pr.content,
                 pr.created_at
             FROM product_reviews pr
             JOIN users u ON pr.user_id = u.user_id
             WHERE pr.product_id = ?
-            ORDER BY pr.created_at DESC`, // Sắp xếp đánh giá mới nhất lên đầu
+            ORDER BY pr.created_at DESC`,
             [id]
         );
         product.reviews = reviewRows;
@@ -199,51 +315,44 @@ const Product = {
     },
 
     /**
-     * Thêm mới một sản phẩm vào cơ sở dữ liệu.
-     * @param {Object} productData - Dữ liệu của sản phẩm (product_name, brand_id, category_id, original_price, discount_price, stock_quantity, status, description_html).
-     * @param {Object} specData - Dữ liệu thông số kỹ thuật (cpu_name, ram_gb, etc.).
-     * @param {Array<string>} imageUrls - Mảng các URL hình ảnh sản phẩm.
+     * Thêm mới một sản phẩm vào cơ sở dữ liệu, bao gồm specs chung, variants và ảnh.
+     * @param {Object} productData - Dữ liệu của sản phẩm (product_name, brand_id, category_id, description_html, highlight_features).
+     * @param {Object} specData - Dữ liệu thông số kỹ thuật chung (screen_size, weight_kg, os).
+     * @param {Array<string>} productLevelImageUrls - Mảng các URL hình ảnh cấp sản phẩm.
+     * @param {Array<Object>} variantsData - Mảng các đối tượng variant, mỗi đối tượng bao gồm data variant và imageUrls.
+     *   variant = { sku, cpu_name, cpu_benchmark_score, gpu, ram_gb, storage_gb, color_name, original_price, discount_price, stock_quantity, status, imageUrls: [] }
      * @returns {Promise<number>} ID của sản phẩm vừa được thêm.
      */
-    create: async (productData, specData, imageUrls) => {
-        const connection = await db.getConnection(); // Sử dụng transaction để đảm bảo toàn vẹn dữ liệu
+    create: async (productData, specData, productLevelImageUrls = [], variantsData = []) => {
+        const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
 
-            // 1. Thêm sản phẩm
+            // 1. Thêm sản phẩm chính
             const productInsertQuery = `
-                INSERT INTO products 
-                (product_name, brand_id, category_id, original_price, discount_price, stock_quantity, status, description_html) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO products
+                (product_name, brand_id, category_id, description_html, highlight_features)
+                VALUES (?, ?, ?, ?, ?)
             `;
             const productValues = [
                 productData.product_name,
                 productData.brand_id,
                 productData.category_id,
-                productData.original_price,
-                productData.discount_price || null,
-                productData.stock_quantity || 0,
-                productData.status || 'IN_STOCK',
-                productData.description_html || null
+                productData.description_html || null,
+                productData.highlight_features || null,
             ];
             const [productResult] = await connection.query(productInsertQuery, productValues);
             const newProductId = productResult.insertId;
 
-            // 2. Thêm thông số kỹ thuật (nếu có)
+            // 2. Thêm thông số kỹ thuật chung (product_specifications)
             if (specData && Object.keys(specData).length > 0) {
                 const specInsertQuery = `
-                    INSERT INTO product_specifications 
-                    (product_id, cpu_name, cpu_benchmark_score, ram_gb, ram_type, storage_gb, gpu, screen_size, weight_kg, os) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO product_specifications
+                    (product_id, screen_size, weight_kg, os)
+                    VALUES (?, ?, ?, ?)
                 `;
                 const specValues = [
                     newProductId,
-                    specData.cpu_name || null,
-                    specData.cpu_benchmark_score || null,
-                    specData.ram_gb || null,
-                    specData.ram_type || null,
-                    specData.storage_gb || null,
-                    specData.gpu || null,
                     specData.screen_size || null,
                     specData.weight_kg || null,
                     specData.os || null
@@ -251,16 +360,52 @@ const Product = {
                 await connection.query(specInsertQuery, specValues);
             }
 
-            // 3. Thêm hình ảnh
-            if (imageUrls && imageUrls.length > 0) {
-                const imageInsertQuery = `
-                    INSERT INTO product_images (product_id, image_url, is_primary) 
-                    VALUES (?, ?, ?)
-                `;
-                for (let i = 0; i < imageUrls.length; i++) {
-                    // Đặt ảnh đầu tiên là ảnh chính
-                    const isPrimary = (i === 0); 
-                    await connection.query(imageInsertQuery, [newProductId, imageUrls[i], isPrimary]);
+            // 3. Thêm hình ảnh cấp sản phẩm
+            if (productLevelImageUrls.length > 0) {
+                const imageInsertQuery = `INSERT INTO product_images (product_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)`;
+                for (let i = 0; i < productLevelImageUrls.length; i++) {
+                    // Ảnh đầu tiên được đặt là chính ở cấp sản phẩm. 
+                    // Duy trì chỉ một ảnh chính cấp sản phẩm được quản lý bởi logic ứng dụng.
+                    const isPrimary = (i === 0); // Ảnh đầu tiên là chính
+                    await connection.query(imageInsertQuery, [newProductId, null, productLevelImageUrls[i], isPrimary]);
+                }
+            }
+
+            // 4. Thêm các phiên bản (variants) và ảnh của từng variant
+            const variantInsertQuery = `
+                INSERT INTO product_variants
+                (product_id, sku, cpu_name, cpu_benchmark_score, gpu, ram_gb, storage_gb, color_name, original_price, discount_price, stock_quantity, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            const variantImageInsertQuery = `INSERT INTO product_images (product_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)`;
+
+            for (const variant of variantsData) {
+                const variantValues = [
+                    newProductId,
+                    variant.sku,
+                    variant.cpu_name || null,
+                    variant.cpu_benchmark_score || null,
+                    variant.gpu || null,
+                    variant.ram_gb,
+                    variant.storage_gb,
+                    variant.color_name,
+                    variant.original_price,
+                    variant.discount_price || null,
+                    variant.stock_quantity || 0,
+                    variant.status || 'IN_STOCK'
+                ];
+                const [variantResult] = await connection.query(variantInsertQuery, variantValues);
+                const newVariantId = variantResult.insertId;
+
+                // Thêm ảnh cho variant này
+                if (variant.imageUrls && variant.imageUrls.length > 0) {
+                    const primaryImageUrl = variant.imageUrls[0]; // Ảnh đầu tiên là ảnh chính
+                    // Thêm ảnh chính
+                    await connection.query(variantImageInsertQuery, [newProductId, newVariantId, primaryImageUrl, true]);
+                    // Thêm các ảnh phụ
+                    for (let i = 1; i < variant.imageUrls.length; i++) {
+                        await connection.query(variantImageInsertQuery, [newProductId, newVariantId, variant.imageUrls[i], false]);
+                    }
                 }
             }
 
@@ -276,22 +421,34 @@ const Product = {
     },
 
     /**
-     * Cập nhật thông tin một sản phẩm.
-     * @param {number} id - ID của sản phẩm cần cập nhật.
+     * Cập nhật thông tin một sản phẩm, specs chung, variants và ảnh.
+     * @param {number} productId - ID của sản phẩm cần cập nhật.
      * @param {Object} productData - Dữ liệu sản phẩm cần cập nhật.
-     * @param {Object} specData - Dữ liệu thông số kỹ thuật cần cập nhật.
-     * @param {Array<string>} newImageUrls - Mảng các URL hình ảnh mới để thêm.
-     * @param {Array<number>} deleteImageIds - Mảng các ID hình ảnh cũ cần xóa.
-     * @param {number} primaryImageId - ID của ảnh muốn đặt làm ảnh chính (nếu có).
-     * @returns {Promise<number>} Số dòng bị ảnh hưởng (0 hoặc 1).
+     * @param {Object} specData - Dữ liệu thông số kỹ thuật chung cần cập nhật.
+     * @param {Array<string>} newProductLevelImageUrls - Mảng các URL hình ảnh cấp sản phẩm mới để thêm.
+     * @param {Array<number>} deleteImageIds - Mảng các ID hình ảnh cũ cần xóa (cả sản phẩm và variant).
+     * @param {number} primaryProductImageId - ID của ảnh cấp sản phẩm muốn đặt làm ảnh chính.
+     * @param {Array<Object>} variantsToUpdate - Mảng các object { variant_id, data, newImageUrls, deleteImageIds, primaryImageId }.
+     * @param {Array<Object>} variantsToCreate - Mảng các object { data, imageUrls }.
+     * @returns {Promise<number>} Số dòng bị ảnh hưởng (ít nhất là 1 nếu có thay đổi).
      */
-    update: async (id, productData, specData, newImageUrls, deleteImageIds, primaryImageId) => {
+    update: async (
+        productId,
+        productData,
+        specData,
+        newProductLevelImageUrls = [],
+        deleteImageIds = [],
+        primaryProductImageId,
+        variantsToUpdate = [],
+        variantsToCreate = []
+    ) => {
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
+            let affectedTotalRows = 0;
 
             // 1. Cập nhật thông tin sản phẩm
-            const allowedProductFields = ['product_name', 'brand_id', 'category_id', 'original_price', 'discount_price', 'stock_quantity', 'status', 'description_html'];
+            const allowedProductFields = ['product_name', 'brand_id', 'category_id', 'description_html', 'highlight_features'];
             const productFieldsToUpdate = [];
             const productValues = [];
 
@@ -304,16 +461,16 @@ const Product = {
 
             if (productFieldsToUpdate.length > 0) {
                 const productUpdateQuery = `UPDATE products SET ${productFieldsToUpdate.join(', ')} WHERE product_id = ?`;
-                productValues.push(id);
-                await connection.query(productUpdateQuery, productValues);
+                productValues.push(productId);
+                const [result] = await connection.query(productUpdateQuery, productValues);
+                affectedTotalRows += result.affectedRows;
             }
 
-            // 2. Cập nhật hoặc thêm thông số kỹ thuật
+            // 2. Cập nhật hoặc thêm thông số kỹ thuật chung (product_specifications)
             if (specData && Object.keys(specData).length > 0) {
-                const [existingSpec] = await connection.query('SELECT spec_id FROM product_specifications WHERE product_id = ?', [id]);
+                const [existingSpec] = await connection.query('SELECT spec_id FROM product_specifications WHERE product_id = ?', [productId]);
                 if (existingSpec.length > 0) {
-                    // Cập nhật thông số kỹ thuật hiện có
-                    const allowedSpecFields = ['cpu_name', 'cpu_benchmark_score', 'ram_gb', 'ram_type', 'storage_gb', 'gpu', 'screen_size', 'weight_kg', 'os'];
+                    const allowedSpecFields = ['screen_size', 'weight_kg', 'os'];
                     const specFieldsToUpdate = [];
                     const specValues = [];
 
@@ -326,69 +483,168 @@ const Product = {
 
                     if (specFieldsToUpdate.length > 0) {
                         const specUpdateQuery = `UPDATE product_specifications SET ${specFieldsToUpdate.join(', ')} WHERE product_id = ?`;
-                        specValues.push(id);
-                        await connection.query(specUpdateQuery, specValues);
+                        specValues.push(productId);
+                        const [result] = await connection.query(specUpdateQuery, specValues);
+                        affectedTotalRows += result.affectedRows;
                     }
                 } else {
-                    // Thêm thông số kỹ thuật mới nếu chưa có
                     const specInsertQuery = `
-                        INSERT INTO product_specifications 
-                        (product_id, cpu_name, cpu_benchmark_score, ram_gb, ram_type, storage_gb, gpu, screen_size, weight_kg, os) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO product_specifications
+                        (product_id, screen_size, weight_kg, os)
+                        VALUES (?, ?, ?, ?)
                     `;
                     const insertSpecValues = [
-                        id,
-                        specData.cpu_name || null,
-                        specData.cpu_benchmark_score || null,
-                        specData.ram_gb || null,
-                        specData.ram_type || null,
-                        specData.storage_gb || null,
-                        specData.gpu || null,
+                        productId,
                         specData.screen_size || null,
                         specData.weight_kg || null,
                         specData.os || null
                     ];
-                    await connection.query(specInsertQuery, insertSpecValues);
+                    const [result] = await connection.query(specInsertQuery, insertSpecValues);
+                    affectedTotalRows += result.affectedRows;
                 }
             }
 
 
-            // 3. Xóa hình ảnh cũ
+            // 3. Xóa hình ảnh cũ (cả cấp sản phẩm và cấp variant)
             if (deleteImageIds && deleteImageIds.length > 0) {
-                // Xóa ảnh trên Cloudinary ở đây nếu cần (phức tạp hơn)
-                const deleteImageQuery = 'DELETE FROM product_images WHERE image_id IN (?) AND product_id = ?';
-                await connection.query(deleteImageQuery, [deleteImageIds, id]);
+                const deleteImageQuery = 'DELETE FROM product_images WHERE image_id IN (?) AND (product_id = ? OR variant_id IN (SELECT variant_id FROM product_variants WHERE product_id = ?))';
+                const [result] = await connection.query(deleteImageQuery, [deleteImageIds, productId, productId]);
+                affectedTotalRows += result.affectedRows;
             }
 
-            // 4. Thêm hình ảnh mới
-            if (newImageUrls && newImageUrls.length > 0) {
-                const imageInsertQuery = 'INSERT INTO product_images (product_id, image_url, is_primary) VALUES (?, ?, ?)';
-                for (const url of newImageUrls) {
-                    await connection.query(imageInsertQuery, [id, url, false]); // Mặc định là không chính
+            // 4. Thêm hình ảnh cấp sản phẩm mới
+            if (newProductLevelImageUrls.length > 0) {
+                const imageInsertQuery = 'INSERT INTO product_images (product_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)';
+                for (const url of newProductLevelImageUrls) {
+                    const [result] = await connection.query(imageInsertQuery, [productId, null, url, false]);
+                    affectedTotalRows += result.affectedRows;
                 }
             }
             
-            // 5. Cập nhật ảnh chính
-            if (primaryImageId) {
-                // Đặt tất cả ảnh của sản phẩm này về không chính
-                await connection.query('UPDATE product_images SET is_primary = FALSE WHERE product_id = ?', [id]);
-                // Đặt ảnh được chỉ định làm chính
-                await connection.query('UPDATE product_images SET is_primary = TRUE WHERE image_id = ? AND product_id = ?', [primaryImageId, id]);
-            } else if (newImageUrls && newImageUrls.length > 0) {
-                // Nếu không có ảnh chính được chỉ định nhưng có ảnh mới, đặt ảnh đầu tiên trong số ảnh mới làm ảnh chính
-                // Hoặc đặt ảnh đầu tiên trong số các ảnh còn lại làm ảnh chính nếu không có ảnh chính nào tồn tại
-                const [currentPrimary] = await connection.query('SELECT image_id FROM product_images WHERE product_id = ? AND is_primary = TRUE', [id]);
-                if (currentPrimary.length === 0) { // Nếu không có ảnh chính nào hiện tại
-                     const [anyImage] = await connection.query('SELECT image_id FROM product_images WHERE product_id = ? LIMIT 1', [id]);
-                     if (anyImage.length > 0) {
-                         await connection.query('UPDATE product_images SET is_primary = TRUE WHERE image_id = ?', [anyImage[0].image_id]);
-                     }
+            // 5. Cập nhật ảnh chính cấp sản phẩm
+            if (primaryProductImageId) {
+                // Đặt tất cả ảnh cấp sản phẩm về không chính trước khi đặt ảnh mới là chính
+                // Logic này do ứng dụng quản lý, không có UNIQUE constraint ở DB cho ảnh cấp sản phẩm
+                await connection.query('UPDATE product_images SET is_primary = FALSE WHERE product_id = ? AND variant_id IS NULL', [productId]);
+                const [result] = await connection.query('UPDATE product_images SET is_primary = TRUE WHERE image_id = ? AND product_id = ? AND variant_id IS NULL', [primaryProductImageId, productId]);
+                affectedTotalRows += result.affectedRows;
+            } else if (newProductLevelImageUrls.length > 0) {
+                // Nếu không có ảnh chính sản phẩm được chỉ định nhưng có ảnh mới, và hiện không có ảnh chính cấp sản phẩm nào, đặt ảnh đầu tiên trong số các ảnh cấp sản phẩm còn lại làm chính.
+                const [currentPrimary] = await connection.query('SELECT image_id FROM product_images WHERE product_id = ? AND variant_id IS NULL AND is_primary = TRUE', [productId]);
+                if (currentPrimary.length === 0) {
+                    const [anyImage] = await connection.query('SELECT image_id FROM product_images WHERE product_id = ? AND variant_id IS NULL LIMIT 1', [productId]);
+                    if (anyImage.length > 0) {
+                        const [result] = await connection.query('UPDATE product_images SET is_primary = TRUE WHERE image_id = ?', [anyImage[0].image_id]);
+                        affectedTotalRows += result.affectedRows;
+                    }
                 }
             }
 
+            // 6. Cập nhật các variants hiện có
+            for (const variantUpdate of variantsToUpdate) {
+                const variantId = variantUpdate.variant_id;
+                const variantData = variantUpdate.data;
+                const newVariantImageUrls = variantUpdate.newImageUrls || [];
+                const deleteVariantImageIds = variantUpdate.deleteImageIds || [];
+                const primaryVariantImageId = variantUpdate.primaryImageId;
+
+                const allowedVariantFields = ['sku', 'cpu_name', 'cpu_benchmark_score', 'gpu', 'ram_gb', 'storage_gb', 'color_name', 'original_price', 'discount_price', 'stock_quantity', 'status'];
+                const variantFieldsToUpdate = [];
+                const variantValues = [];
+
+                allowedVariantFields.forEach(field => {
+                    if (variantData[field] !== undefined) {
+                        variantFieldsToUpdate.push(`${field} = ?`);
+                        variantValues.push(variantData[field]);
+                    }
+                });
+
+                if (variantFieldsToUpdate.length > 0) {
+                    const variantUpdateQuery = `UPDATE product_variants SET ${variantFieldsToUpdate.join(', ')} WHERE variant_id = ? AND product_id = ?`;
+                    variantValues.push(variantId, productId);
+                    const [result] = await connection.query(variantUpdateQuery, variantValues);
+                    affectedTotalRows += result.affectedRows;
+                }
+
+                // Xóa ảnh variant cũ
+                if (deleteVariantImageIds.length > 0) {
+                    const deleteImageQuery = 'DELETE FROM product_images WHERE image_id IN (?) AND variant_id = ? AND product_id = ?';
+                    const [result] = await connection.query(deleteImageQuery, [deleteVariantImageIds, variantId, productId]);
+                    affectedTotalRows += result.affectedRows;
+                }
+
+                // Thêm ảnh variant mới
+                if (newVariantImageUrls.length > 0) {
+                    const imageInsertQuery = 'INSERT INTO product_images (product_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)';
+                    for (const url of newVariantImageUrls) {
+                        // Ảnh mới được thêm vào sẽ là ảnh phụ (is_primary = FALSE)
+                        const [result] = await connection.query(imageInsertQuery, [productId, variantId, url, false]);
+                        affectedTotalRows += result.affectedRows;
+                    }
+                }
+
+                // Cập nhật ảnh chính variant
+                if (primaryVariantImageId) {
+                    // Đặt tất cả ảnh của variant này về không chính
+                    await connection.query('UPDATE product_images SET is_primary = FALSE WHERE variant_id = ?', [variantId]);
+                    // Đặt ảnh được chỉ định làm chính
+                    const [result] = await connection.query('UPDATE product_images SET is_primary = TRUE WHERE image_id = ? AND variant_id = ?', [primaryVariantImageId, variantId]);
+                    affectedTotalRows += result.affectedRows;
+                } else { // Nếu không có primaryVariantImageId được chỉ định
+                    const [currentPrimary] = await connection.query('SELECT image_id FROM product_images WHERE variant_id = ? AND is_primary = TRUE', [variantId]);
+                    if (currentPrimary.length === 0) { // Nếu hiện tại không có ảnh chính nào
+                        // Tìm một ảnh bất kỳ (ưu tiên ảnh mới nếu có, hoặc ảnh hiện có) và đặt làm chính
+                        const [anyImage] = await connection.query('SELECT image_id FROM product_images WHERE variant_id = ? LIMIT 1', [variantId]);
+                        if (anyImage.length > 0) {
+                            const [result] = await connection.query('UPDATE product_images SET is_primary = TRUE WHERE image_id = ?', [anyImage[0].image_id]);
+                            affectedTotalRows += result.affectedRows;
+                        }
+                    }
+                }
+            }
+
+            // 7. Thêm các variants mới
+            const variantInsertQuery = `
+                INSERT INTO product_variants
+                (product_id, sku, cpu_name, cpu_benchmark_score, gpu, ram_gb, storage_gb, color_name, original_price, discount_price, stock_quantity, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            const variantImageInsertQuery = `INSERT INTO product_images (product_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)`;
+
+            for (const variant of variantsToCreate) {
+                const variantValues = [
+                    productId,
+                    variant.sku,
+                    variant.cpu_name || null,
+                    variant.cpu_benchmark_score || null,
+                    variant.gpu || null,
+                    variant.ram_gb,
+                    variant.storage_gb,
+                    variant.color_name,
+                    variant.original_price,
+                    variant.discount_price || null,
+                    variant.stock_quantity || 0,
+                    variant.status || 'IN_STOCK'
+                ];
+                const [result] = await connection.query(variantInsertQuery, variantValues);
+                const newVariantId = result.insertId;
+                affectedTotalRows += result.affectedRows;
+
+                if (variant.imageUrls && variant.imageUrls.length > 0) {
+                    const primaryImageUrl = variant.imageUrls[0];
+                    // Thêm ảnh chính cho variant mới
+                    const [imgResultPrimary] = await connection.query(variantImageInsertQuery, [productId, newVariantId, primaryImageUrl, true]);
+                    affectedTotalRows += imgResultPrimary.affectedRows;
+                    // Thêm các ảnh phụ cho variant mới
+                    for (let i = 1; i < variant.imageUrls.length; i++) {
+                        const [imgResultSecondary] = await connection.query(variantImageInsertQuery, [productId, newVariantId, variant.imageUrls[i], false]);
+                        affectedTotalRows += imgResultSecondary.affectedRows;
+                    }
+                }
+            }
 
             await connection.commit();
-            return 1; // Giả sử 1 dòng bị ảnh hưởng nếu không có lỗi
+            return affectedTotalRows;
         } catch (error) {
             await connection.rollback();
             throw error;
@@ -398,27 +654,20 @@ const Product = {
     },
 
     /**
-     * Cập nhật trạng thái của một sản phẩm.
-     * @param {number} id - ID của sản phẩm cần cập nhật.
+     * Cập nhật trạng thái của TẤT CẢ variants của một sản phẩm.
+     * @param {number} productId - ID của sản phẩm.
      * @param {string} newStatus - Trạng thái mới (ví dụ: 'IN_STOCK', 'OUT_OF_STOCK', 'DISCONTINUED').
-     * @returns {Promise<number>} Số dòng bị ảnh hưởng (0 hoặc 1).
+     * @returns {Promise<number>} Số dòng bị ảnh hưởng (số lượng variants).
      */
-    updateProductStatus: async (id, newStatus) => {
-        // Đảm bảo trạng thái mới là một trong các giá trị hợp lệ của ENUM
-        const validStatuses = ['IN_STOCK', 'OUT_OF_STOCK', 'COMING_SOON', 'DISCONTINUED'];
-        if (!validStatuses.includes(newStatus)) {
-            throw new Error(`Trạng thái "${newStatus}" không hợp lệ.`);
-        }
-
-        const query = 'UPDATE products SET status = ? WHERE product_id = ?';
-        const [result] = await db.query(query, [newStatus, id]);
+    updateProductVariantsStatus: async (productId, newStatus) => {
+        const query = 'UPDATE product_variants SET status = ? WHERE product_id = ?';
+        const [result] = await db.query(query, [newStatus, productId]);
         return result.affectedRows;
     },
 
     /**
      * Hàm xóa sản phẩm vật lý khỏi database.
-     * Hàm này được giữ lại nếu sau này bạn muốn có một API xóa cứng riêng biệt (chỉ dùng cho Admin cấp cao).
-     * Hiện tại, API DELETE sẽ chỉ cập nhật trạng thái.
+     * Việc xóa sản phẩm sẽ CASCADE xóa các specs, variants và images liên quan.
      * @param {number} id - ID của sản phẩm cần xóa cứng.
      * @returns {Promise<number>} Số dòng bị ảnh hưởng (0 hoặc 1).
      */

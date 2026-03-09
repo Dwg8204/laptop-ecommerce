@@ -1,7 +1,12 @@
 const Brand = require('../models/brandModel');
+const db = require('../config/db');
+const { parseQueryParams, getOffset, buildPaginationResult } = require('../helpers/queryHelper');
+const { isValidId } = require('../helpers/productValidationHelper');
 
 const brandController = {
-    // API: Lấy tất cả thương hiệu (GET /api/brands)
+    /**
+     * API: Lấy tất cả thương hiệu (GET /api/brands)
+     */
     getAllBrands: async (req, res) => {
         try {
             const brands = await Brand.getAll();
@@ -20,6 +25,11 @@ const brandController = {
     getBrandById: async (req, res) => {
         try {
             const { id } = req.params;
+
+            if (!isValidId(id)) {
+                return res.status(400).json({ success: false, message: 'ID thương hiệu không hợp lệ.' });
+            }
+
             const brand = await Brand.getById(id);
 
             if (!brand) {
@@ -45,15 +55,11 @@ const brandController = {
         try {
             const { brand_name, logo_url } = req.body;
 
-            if (!brand_name) {
-                return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tên thương hiệu.' });
+            // Validate dữ liệu đầu vào
+            const errors = Brand.validateBrandData({ brand_name, logo_url });
+            if (errors.length > 0) {
+                return res.status(400).json({ success: false, message: 'Lỗi dữ liệu thương hiệu', errors });
             }
-
-            // Có thể kiểm tra trùng tên thương hiệu ở đây trước khi tạo
-            // const existingBrand = await Brand.getByName(brand_name); // Cần thêm hàm getByName
-            // if (existingBrand) {
-            //     return res.status(409).json({ success: false, message: 'Tên thương hiệu đã tồn tại.' });
-            // }
 
             const newBrandId = await Brand.create({ brand_name, logo_url });
 
@@ -64,7 +70,7 @@ const brandController = {
             });
         } catch (error) {
             console.error('Lỗi khi thêm thương hiệu:', error);
-            if (error.code === 'ER_DUP_ENTRY') { // MySQL duplicate entry error code
+            if (error.code === 'ER_DUP_ENTRY') {
                 return res.status(409).json({ success: false, message: 'Tên thương hiệu đã tồn tại.' });
             }
             res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
@@ -80,9 +86,19 @@ const brandController = {
             const { id } = req.params;
             const { brand_name, logo_url } = req.body;
 
+            if (!isValidId(id)) {
+                return res.status(400).json({ success: false, message: 'ID thương hiệu không hợp lệ.' });
+            }
+
             const existingBrand = await Brand.getById(id);
             if (!existingBrand) {
                 return res.status(404).json({ success: false, message: 'Thương hiệu không tồn tại để cập nhật!' });
+            }
+
+            // Validate dữ liệu đầu vào
+            const errors = Brand.validateBrandData({ brand_name, logo_url }, true); // isUpdate = true
+            if (errors.length > 0) {
+                return res.status(400).json({ success: false, message: 'Lỗi dữ liệu cập nhật thương hiệu', errors });
             }
 
             const updateData = {};
@@ -96,7 +112,8 @@ const brandController = {
             const affectedRows = await Brand.update(id, updateData);
 
             if (affectedRows === 0) {
-                return res.status(400).json({ success: false, message: 'Không có thay đổi nào được thực hiện hoặc thương hiệu không tồn tại.' });
+                // Điều này có thể xảy ra nếu dữ liệu gửi lên giống hệt dữ liệu hiện có
+                return res.status(200).json({ success: true, message: 'Không có thay đổi nào được thực hiện.' });
             }
 
             res.status(200).json({
@@ -113,21 +130,29 @@ const brandController = {
     },
 
     // API: Xóa thương hiệu (DELETE /api/brands/:id)
-    
     deleteBrand: async (req, res) => {
         try {
             const { id } = req.params;
+
+            if (!isValidId(id)) {
+                return res.status(400).json({ success: false, message: 'ID thương hiệu không hợp lệ.' });
+            }
+
+            const existingBrand = await Brand.getById(id);
+            if (!existingBrand) {
+                return res.status(404).json({ success: false, message: 'Thương hiệu không tồn tại để xóa!' });
+            }
+
             // Kiểm tra xem có sản phẩm nào đang sử dụng thương hiệu này không
-            // Lớp bảo vệ bổ sung ngoài ràng buộc FOREIGN KEY ON DELETE RESTRICT
-            const productsUsingBrand = await Brand.productsUsingBrand(id);
-            if (productsUsingBrand > 0) {
+            const [productsUsingBrand] = await db.query('SELECT product_id FROM products WHERE brand_id = ? LIMIT 1', [id]);
+            if (productsUsingBrand.length > 0) {
                 return res.status(409).json({ success: false, message: 'Không thể xóa thương hiệu này vì có sản phẩm đang sử dụng nó.' });
             }
 
             const affectedRows = await Brand.remove(id);
 
-            if (affectedRows === 0) {
-                return res.status(404).json({ success: false, message: 'Thương hiệu không tồn tại để xóa!' });
+            if (affectedRows === 0) { // Trường hợp này hiếm nếu đã kiểm tra tồn tại ở trên
+                return res.status(400).json({ success: false, message: 'Không thể xóa thương hiệu.' });
             }
 
             res.status(200).json({
@@ -137,17 +162,11 @@ const brandController = {
         } catch (error) {
             console.error('Lỗi khi xóa thương hiệu:', error);
             if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-                return res.status(409).json({
-                    success: false,
-                    message: 'Không thể xóa thương hiệu này vì có sản phẩm đang sử dụng nó.'
-                });
+                return res.status(409).json({ success: false, message: 'Không thể xóa thương hiệu này vì có sản phẩm đang sử dụng nó. Vui lòng cập nhật hoặc xóa các sản phẩm liên quan trước.' });
             }
-            return res.status(500).json({
-                success: false,
-                message: 'Lỗi máy chủ nội bộ'
-            });
-            }
+            res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
         }
+    }
 };
 
 module.exports = brandController;

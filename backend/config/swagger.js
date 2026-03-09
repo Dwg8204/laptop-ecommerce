@@ -29,6 +29,18 @@ const swaggerOptions = {
                 description: 'API đăng ký và đăng nhập người dùng'
             },
             {
+                name: 'Products',
+                description: 'API quản lý sản phẩm và biến thể sản phẩm'
+            },
+            {
+                name: 'Product Categories',
+                description: 'API quản lý danh mục sản phẩm'
+            },
+            {
+                name: 'Brands',
+                description: 'API quản lý thương hiệu laptop'
+            },
+            {
                 name: 'Sliders',
                 description: 'API quản lý banner sliders'
             },
@@ -143,11 +155,6 @@ const swaggerOptions = {
                             description: 'Trạng thái tài khoản',
                             example: 'ACTIVE'
                         },
-                        is_email_verified: {
-                            type: 'boolean',
-                            description: 'Email đã xác thực chưa',
-                            example: false
-                        },
                         created_at: {
                             type: 'string',
                             format: 'date-time',
@@ -245,6 +252,47 @@ const swaggerOptions = {
                             type: 'string',
                             description: 'Tên tác giả',
                             example: 'Admin'
+                        }
+                    }
+                },
+                ProductCategory: {
+                    type: 'object',
+                    properties: {
+                        category_id: {
+                            type: 'integer',
+                            example: 1
+                        },
+                        category_name: {
+                            type: 'string',
+                            example: 'Laptop Gaming'
+                        },
+                        parent_category_id: {
+                            type: 'integer',
+                            nullable: true,
+                            example: null
+                        }
+                    }
+                },
+                Brand: {
+                    type: 'object',
+                    properties: {
+                        brand_id: {
+                            type: 'integer',
+                            example: 1
+                        },
+                        brand_name: {
+                            type: 'string',
+                            example: 'ASUS'
+                        },
+                        logo_url: {
+                            type: 'string',
+                            nullable: true,
+                            example: 'https://example.com/asus-logo.png'
+                        },
+                        product_count: {
+                            type: 'integer',
+                            description: 'Số lượng sản phẩm của thương hiệu',
+                            example: 15
                         }
                     }
                 }

@@ -11,6 +11,8 @@ import Admin from "./pages/Admin"
 import OrderTracking from "./pages/OrderTracking"
 import News from "./pages/News"
 import Notifications from "./pages/Notifications"
+import ResetPassword from "./pages/ResetPassword"
+import FacebookCallback from "./pages/FacebookCallback"
 
 function App() {
   return (
@@ -19,12 +21,15 @@ function App() {
         <CartProvider>
           <BrowserRouter>
             <Routes>
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/auth/facebook-callback" element={<FacebookCallback />} />
               <Route element={<MainLayout />}>
                 <Route path="/home" element={<Home />} />
                 <Route path="/" element={<Laptop />} />
                 <Route path="/product/:id" element={<ProductDetail />} />
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/news" element={<News />} />
+                <Route path="/news/:id" element={<News />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/order-tracking" element={<OrderTracking />} />
                 <Route path="/admin" element={<Admin />} />

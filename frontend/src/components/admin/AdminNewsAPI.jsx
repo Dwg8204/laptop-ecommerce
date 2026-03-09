@@ -11,7 +11,6 @@ import {
   FiImage,
   FiTag,
   FiSearch,
-  FiFilter,
   FiCheckCircle,
   FiClock,
   FiAlertCircle
@@ -33,6 +32,18 @@ const statusIcon = (status) => {
   if (status === "PUBLISHED") return <FiCheckCircle />
   if (status === "HIDDEN") return <FiEyeOff />
   return null
+}
+
+const plainText = (html) =>
+  String(html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+const excerpt = (html, max = 140) => {
+  const text = plainText(html)
+  if (!text) return ""
+  return text.length > max ? `${text.slice(0, max).trim()}...` : text
 }
 
 function AdminNewsAPI() {
@@ -138,7 +149,7 @@ function AdminNewsAPI() {
   const validatePostForm = () => {
     if (!postForm.category_id) return "Vui lòng chọn danh mục"
     if (!postForm.title.trim()) return "Vui lòng nhập tiêu đề"
-    if (!postForm.content_html.trim()) return "Vui lòng nhập nội dung"
+    if (!plainText(postForm.content_html)) return "Vui lòng nhập nội dung"
     return ""
   }
 
@@ -256,7 +267,10 @@ function AdminNewsAPI() {
   return (
     <div className="admin-news-container">
       <div className="admin-news-header">
-        <h2>📰 Quản lý Tin tức</h2>
+        <div>
+          <h2>📰 Quản lý Tin tức</h2>
+          <p className="admin-news-subtitle">Sắp xếp nội dung, trạng thái và danh mục trên một màn hình rõ ràng.</p>
+        </div>
         <div className="header-actions">
           <button 
             className="btn-primary"
@@ -282,311 +296,358 @@ function AdminNewsAPI() {
         </div>
       )}
 
-      {/* CATEGORY MANAGEMENT */}
-      {showCategoryForm && (
-        <div className="card category-section">
-          <div className="card-header">
-            <h3><FiTag /> Danh mục</h3>
-            <button className="btn-icon" onClick={() => setShowCategoryForm(false)}>
-              <FiX />
-            </button>
-          </div>
-          <div className="card-body">
-            {/* Create Category Form */}
-            <form onSubmit={handleCreateCategory} className="category-form">
-              <div className="form-row">
-                <input
-                  type="text"
-                  placeholder="Tên danh mục"
-                  value={categoryForm.category_name}
-                  onChange={(e) => setCategoryForm({...categoryForm, category_name: e.target.value})}
-                  className="form-input"
-                />
-                <input
-                  type="text"
-                  placeholder="Mô tả (tùy chọn)"
-                  value={categoryForm.description}
-                  onChange={(e) => setCategoryForm({...categoryForm, description: e.target.value})}
-                  className="form-input"
-                />
-                <button type="submit" className="btn-primary">
-                  <FiPlus /> Thêm
+      <section className="news-overview">
+        <div className="news-overview-card">
+          <span className="news-overview-label">Tổng bài viết</span>
+          <strong>{posts.length}</strong>
+        </div>
+        <div className="news-overview-card is-published">
+          <span className="news-overview-label">Đã đăng</span>
+          <strong>{posts.filter((p) => p.status === "PUBLISHED").length}</strong>
+        </div>
+        <div className="news-overview-card is-draft">
+          <span className="news-overview-label">Bản nháp</span>
+          <strong>{posts.filter((p) => p.status === "DRAFT").length}</strong>
+        </div>
+        <div className="news-overview-card is-categories">
+          <span className="news-overview-label">Danh mục</span>
+          <strong>{categories.length}</strong>
+        </div>
+      </section>
+
+      <div className="admin-news-layout">
+        <aside className="admin-news-left">
+          {/* CATEGORY MANAGEMENT */}
+          {showCategoryForm && (
+            <div className="card category-section">
+              <div className="card-header">
+                <h3><FiTag /> Danh mục</h3>
+                <button className="btn-icon" onClick={() => setShowCategoryForm(false)}>
+                  <FiX />
                 </button>
               </div>
-            </form>
-
-            {/* Category List */}
-            <div className="category-list">
-              {categories.length === 0 ? (
-                <p className="text-muted">Chưa có danh mục nào</p>
-              ) : (
-                categories.map(cat => (
-                  <div key={cat.category_id} className="category-item">
-                    <div className="category-info">
-                      <strong>{cat.category_name}</strong>
-                      {cat.description && <span className="text-muted">— {cat.description}</span>}
-                    </div>
-                    <button 
-                      className="btn-icon btn-danger"
-                      onClick={() => handleDeleteCategory(cat.category_id)}
-                      title="Xóa danh mục"
-                    >
-                      <FiTrash2 />
+              <div className="card-body">
+                <form onSubmit={handleCreateCategory} className="category-form">
+                  <div className="form-row">
+                    <input
+                      type="text"
+                      placeholder="Tên danh mục"
+                      value={categoryForm.category_name}
+                      onChange={(e) => setCategoryForm({...categoryForm, category_name: e.target.value})}
+                      className="form-input"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Mô tả (tùy chọn)"
+                      value={categoryForm.description}
+                      onChange={(e) => setCategoryForm({...categoryForm, description: e.target.value})}
+                      className="form-input"
+                    />
+                    <button type="submit" className="btn-primary">
+                      <FiPlus /> Thêm
                     </button>
                   </div>
-                ))
+                </form>
+
+                <div className="category-list">
+                  {categories.length === 0 ? (
+                    <p className="text-muted">Chưa có danh mục nào</p>
+                  ) : (
+                    categories.map(cat => (
+                      <div key={cat.category_id} className="category-item">
+                        <div className="category-info">
+                          <strong>{cat.category_name}</strong>
+                          {cat.description && <span className="text-muted">— {cat.description}</span>}
+                        </div>
+                        <button 
+                          className="btn-icon btn-danger"
+                          onClick={() => handleDeleteCategory(cat.category_id)}
+                          title="Xóa danh mục"
+                        >
+                          <FiTrash2 />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* POST FORM */}
+          {showPostForm && (
+            <div className="card post-form-section">
+              <div className="card-header">
+                <h3>{editingPostId ? "✏️ Chỉnh sửa bài viết" : "➕ Tạo bài viết mới"}</h3>
+                <button className="btn-icon" onClick={resetPostForm}>
+                  <FiX />
+                </button>
+              </div>
+              <div className="card-body">
+                <form onSubmit={handleSubmitPost}>
+                  <div className="form-group">
+                    <label>Danh mục *</label>
+                    <select
+                      value={postForm.category_id}
+                      onChange={(e) => setPostForm({...postForm, category_id: e.target.value})}
+                      className="form-select"
+                      required
+                    >
+                      <option value="">-- Chọn danh mục --</option>
+                      {categories.map(cat => (
+                        <option key={cat.category_id} value={cat.category_id}>
+                          {cat.category_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Tiêu đề *</label>
+                    <input
+                      type="text"
+                      value={postForm.title}
+                      onChange={(e) => setPostForm({...postForm, title: e.target.value})}
+                      className="form-input"
+                      placeholder="Nhập tiêu đề bài viết"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Ảnh thumbnail (URL)</label>
+                    <div className="input-with-icon">
+                      <FiImage />
+                      <input
+                        type="text"
+                        value={postForm.thumbnail_url}
+                        onChange={(e) => setPostForm({...postForm, thumbnail_url: e.target.value})}
+                        className="form-input"
+                        placeholder="https://example.com/image.jpg"
+                      />
+                    </div>
+                    {postForm.thumbnail_url && (
+                      <img 
+                        src={postForm.thumbnail_url} 
+                        alt="Preview" 
+                        className="thumbnail-preview"
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label>Nội dung bài viết *</label>
+                    <textarea
+                      value={postForm.content_html}
+                      onChange={(e) => setPostForm({ ...postForm, content_html: e.target.value })}
+                      placeholder="Nhập nội dung tin tức (hỗ trợ HTML cơ bản)..."
+                      className="form-textarea news-editor"
+                      rows="8"
+                    />
+                    <small className="editor-hint">
+                      💡 Bạn có thể nhập HTML cơ bản: &lt;h2&gt;Tiêu đề&lt;/h2&gt;, &lt;p&gt;Đoạn văn&lt;/p&gt;, &lt;img src="..."&gt;, &lt;a href="..."&gt;Liên kết&lt;/a&gt;
+                    </small>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Trạng thái</label>
+                    <select
+                      value={postForm.status}
+                      onChange={(e) => setPostForm({...postForm, status: e.target.value})}
+                      className="form-select"
+                    >
+                      <option value="DRAFT">Nháp</option>
+                      <option value="PUBLISHED">Đã đăng</option>
+                      <option value="HIDDEN">Ẩn</option>
+                    </select>
+                  </div>
+
+                  <div className="form-actions">
+                    <button type="button" className="btn-secondary" onClick={resetPostForm}>
+                      <FiX /> Hủy
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn-warning"
+                      onClick={(e) => handleSubmitPost(e, "DRAFT")}
+                    >
+                      <FiSave /> Lưu nháp
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn-success"
+                    >
+                      <FiCheckCircle /> {editingPostId ? "Cập nhật" : "Đăng bài"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+        </aside>
+
+        <section className="admin-news-right">
+          {/* FILTERS */}
+          <div className="card filters-section">
+            <div className="card-header">
+              <h3><FiSearch /> Bộ lọc nhanh</h3>
+            </div>
+            <div className="card-body">
+              <div className="filters-grid">
+                <div className="filter-field">
+                  <label className="filter-label">Từ khóa</label>
+                  <div className="search-box">
+                    <FiSearch />
+                    <input
+                      type="text"
+                      placeholder="Tìm theo tiêu đề hoặc nội dung..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="filter-field">
+                  <label className="filter-label">Danh mục</label>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="form-select"
+                  >
+                    <option value="ALL">Tất cả danh mục</option>
+                    {categories.map(cat => (
+                      <option key={cat.category_id} value={String(cat.category_id)}>
+                        {cat.category_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="filter-field">
+                  <label className="filter-label">Trạng thái</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="form-select"
+                  >
+                    <option value="ALL">Tất cả trạng thái</option>
+                    <option value="DRAFT">Nháp</option>
+                    <option value="PUBLISHED">Đã đăng</option>
+                    <option value="HIDDEN">Ẩn</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* POSTS LIST */}
+          <div className="card posts-section">
+            <div className="card-header">
+              <h3>📝 Danh sách bài viết ({filteredPosts.length})</h3>
+            </div>
+            <div className="card-body">
+              {loading ? (
+                <div className="loading-spinner">Đang tải...</div>
+              ) : filteredPosts.length === 0 ? (
+                <p className="text-muted">Không có bài viết nào</p>
+              ) : (
+                <div className="posts-list">
+                  {filteredPosts.map(post => (
+                    <div key={post.post_id} className="post-item">
+                      <div className="post-thumbnail">
+                        {post.thumbnail_url ? (
+                          <img src={post.thumbnail_url} alt={post.title} />
+                        ) : (
+                          <div className="placeholder-thumbnail">
+                            <FiImage />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="post-content">
+                        <div className="post-meta">
+                          <span className="post-category">
+                            <FiTag /> {categoryMap[post.category_id] || "Không rõ"}
+                          </span>
+                          <span className={`post-status status-${post.status.toLowerCase()}`}>
+                            {statusIcon(post.status)} {statusLabel(post.status)}
+                          </span>
+                        </div>
+
+                        <h4 className="post-title">{post.title}</h4>
+
+                        {excerpt(post.content_html) && (
+                          <p className="post-excerpt">{excerpt(post.content_html)}</p>
+                        )}
+
+                        <div className="post-info">
+                          <span><FiEye /> {post.view_count || 0} lượt xem</span>
+                          {post.published_at && (
+                            <span>📅 {new Date(post.published_at).toLocaleDateString('vi-VN')}</span>
+                          )}
+                          {post.updated_at && (
+                            <span>🛠️ Cập nhật: {new Date(post.updated_at).toLocaleDateString('vi-VN')}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="post-actions">
+                        <button 
+                          className="btn-icon btn-primary"
+                          onClick={() => handleEditPost(post)}
+                          title="Chỉnh sửa"
+                        >
+                          <FiEdit2 />
+                        </button>
+
+                        {post.status === "DRAFT" && (
+                          <button 
+                            className="btn-icon btn-success"
+                            onClick={() => handleChangeStatus(post.post_id, "PUBLISHED")}
+                            title="Đăng bài"
+                          >
+                            <FiCheckCircle />
+                          </button>
+                        )}
+
+                        {post.status === "PUBLISHED" && (
+                          <button 
+                            className="btn-icon btn-warning"
+                            onClick={() => handleChangeStatus(post.post_id, "HIDDEN")}
+                            title="Ẩn bài"
+                          >
+                            <FiEyeOff />
+                          </button>
+                        )}
+
+                        {post.status === "HIDDEN" && (
+                          <button 
+                            className="btn-icon btn-info"
+                            onClick={() => handleChangeStatus(post.post_id, "PUBLISHED")}
+                            title="Hiện bài"
+                          >
+                            <FiEye />
+                          </button>
+                        )}
+
+                        <button 
+                          className="btn-icon btn-danger"
+                          onClick={() => handleDeletePost(post.post_id)}
+                          title="Xóa"
+                        >
+                          <FiTrash2 />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* POST FORM */}
-      {showPostForm && (
-        <div className="card post-form-section">
-          <div className="card-header">
-            <h3>{editingPostId ? "✏️ Chỉnh sửa bài viết" : "➕ Tạo bài viết mới"}</h3>
-            <button className="btn-icon" onClick={resetPostForm}>
-              <FiX />
-            </button>
-          </div>
-          <div className="card-body">
-            <form onSubmit={handleSubmitPost}>
-              <div className="form-group">
-                <label>Danh mục *</label>
-                <select
-                  value={postForm.category_id}
-                  onChange={(e) => setPostForm({...postForm, category_id: e.target.value})}
-                  className="form-select"
-                  required
-                >
-                  <option value="">-- Chọn danh mục --</option>
-                  {categories.map(cat => (
-                    <option key={cat.category_id} value={cat.category_id}>
-                      {cat.category_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Tiêu đề *</label>
-                <input
-                  type="text"
-                  value={postForm.title}
-                  onChange={(e) => setPostForm({...postForm, title: e.target.value})}
-                  className="form-input"
-                  placeholder="Nhập tiêu đề bài viết"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Ảnh thumbnail (URL)</label>
-                <div className="input-with-icon">
-                  <FiImage />
-                  <input
-                    type="text"
-                    value={postForm.thumbnail_url}
-                    onChange={(e) => setPostForm({...postForm, thumbnail_url: e.target.value})}
-                    className="form-input"
-                    placeholder="https://example.com/image.jpg"
-                  />
-                </div>
-                {postForm.thumbnail_url && (
-                  <img 
-                    src={postForm.thumbnail_url} 
-                    alt="Preview" 
-                    className="thumbnail-preview"
-                    onError={(e) => e.target.style.display = 'none'}
-                  />
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Nội dung (HTML) *</label>
-                <textarea
-                  value={postForm.content_html}
-                  onChange={(e) => setPostForm({...postForm, content_html: e.target.value})}
-                  className="form-textarea"
-                  rows="10"
-                  placeholder="<p>Nhập nội dung HTML...</p>"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Trạng thái</label>
-                <select
-                  value={postForm.status}
-                  onChange={(e) => setPostForm({...postForm, status: e.target.value})}
-                  className="form-select"
-                >
-                  <option value="DRAFT">Nháp</option>
-                  <option value="PUBLISHED">Đã đăng</option>
-                  <option value="HIDDEN">Ẩn</option>
-                </select>
-              </div>
-
-              <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={resetPostForm}>
-                  <FiX /> Hủy
-                </button>
-                <button 
-                  type="button" 
-                  className="btn-warning"
-                  onClick={(e) => handleSubmitPost(e, "DRAFT")}
-                >
-                  <FiSave /> Lưu nháp
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn-success"
-                >
-                  <FiCheckCircle /> {editingPostId ? "Cập nhật" : "Đăng bài"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* FILTERS */}
-      <div className="card filters-section">
-        <div className="filters-row">
-          <div className="search-box">
-            <FiSearch />
-            <input
-              type="text"
-              placeholder="Tìm kiếm bài viết..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="form-input"
-            />
-          </div>
-
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="form-select"
-          >
-            <option value="ALL">Tất cả danh mục</option>
-            {categories.map(cat => (
-              <option key={cat.category_id} value={String(cat.category_id)}>
-                {cat.category_name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="form-select"
-          >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="DRAFT">Nháp</option>
-            <option value="PUBLISHED">Đã đăng</option>
-            <option value="HIDDEN">Ẩn</option>
-          </select>
-        </div>
-      </div>
-
-      {/* POSTS LIST */}
-      <div className="card posts-section">
-        <div className="card-header">
-          <h3>📝 Danh sách bài viết ({filteredPosts.length})</h3>
-        </div>
-        <div className="card-body">
-          {loading ? (
-            <div className="loading-spinner">Đang tải...</div>
-          ) : filteredPosts.length === 0 ? (
-            <p className="text-muted">Không có bài viết nào</p>
-          ) : (
-            <div className="posts-list">
-              {filteredPosts.map(post => (
-                <div key={post.post_id} className="post-item">
-                  <div className="post-thumbnail">
-                    {post.thumbnail_url ? (
-                      <img src={post.thumbnail_url} alt={post.title} />
-                    ) : (
-                      <div className="placeholder-thumbnail">
-                        <FiImage />
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="post-content">
-                    <div className="post-meta">
-                      <span className="post-category">
-                        <FiTag /> {categoryMap[post.category_id] || "Không rõ"}
-                      </span>
-                      <span className={`post-status status-${post.status.toLowerCase()}`}>
-                        {statusIcon(post.status)} {statusLabel(post.status)}
-                      </span>
-                    </div>
-                    
-                    <h4 className="post-title">{post.title}</h4>
-                    
-                    <div className="post-info">
-                      <span><FiEye /> {post.view_count || 0} lượt xem</span>
-                      {post.published_at && (
-                        <span>📅 {new Date(post.published_at).toLocaleDateString('vi-VN')}</span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="post-actions">
-                    <button 
-                      className="btn-icon btn-primary"
-                      onClick={() => handleEditPost(post)}
-                      title="Chỉnh sửa"
-                    >
-                      <FiEdit2 />
-                    </button>
-                    
-                    {post.status === "DRAFT" && (
-                      <button 
-                        className="btn-icon btn-success"
-                        onClick={() => handleChangeStatus(post.post_id, "PUBLISHED")}
-                        title="Đăng bài"
-                      >
-                        <FiCheckCircle />
-                      </button>
-                    )}
-                    
-                    {post.status === "PUBLISHED" && (
-                      <button 
-                        className="btn-icon btn-warning"
-                        onClick={() => handleChangeStatus(post.post_id, "HIDDEN")}
-                        title="Ẩn bài"
-                      >
-                        <FiEyeOff />
-                      </button>
-                    )}
-                    
-                    {post.status === "HIDDEN" && (
-                      <button 
-                        className="btn-icon btn-info"
-                        onClick={() => handleChangeStatus(post.post_id, "PUBLISHED")}
-                        title="Hiện bài"
-                      >
-                        <FiEye />
-                      </button>
-                    )}
-                    
-                    <button 
-                      className="btn-icon btn-danger"
-                      onClick={() => handleDeletePost(post.post_id)}
-                      title="Xóa"
-                    >
-                      <FiTrash2 />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        </section>
       </div>
     </div>
   )

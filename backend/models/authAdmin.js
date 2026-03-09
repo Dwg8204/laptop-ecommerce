@@ -5,14 +5,14 @@ const AuthAdmin = {
     createStaff: async (userData) => {
         const { email, password_hash, full_name, phone_number } = userData;
         const [result] = await pool.execute(
-            `INSERT INTO users (email, password_hash, full_name, phone_number, status, is_email_verified) 
-             VALUES (?, ?, ?, ?, 'ACTIVE', FALSE)`,
+            `INSERT INTO users (email, password_hash, full_name, phone_number, status) 
+             VALUES (?, ?, ?, ?, 'ACTIVE')`,
             [email, password_hash, full_name, phone_number]
         );
         return result.insertId;
     },
 
-    // Gán role cho staff (role_id: support=2, sales=4, warehouse=5, admin=1)
+    // Gán role cho staff (role_id: staff=2, admin=1)
     assignRole: async (userId, roleId = 2) => {
         await pool.execute(
             'INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)',
@@ -32,7 +32,7 @@ const AuthAdmin = {
             FROM users u
             INNER JOIN user_roles ur ON u.user_id = ur.user_id
             INNER JOIN roles r ON ur.role_id = r.role_id
-            WHERE u.user_id = ? AND r.role_name IN ('admin', 'support', 'sales', 'warehouse')
+            WHERE u.user_id = ? AND LOWER(r.role_name) IN ('admin', 'staff')
         `, [userId]);
         return rows[0];
     }
