@@ -81,7 +81,6 @@ Swagger UI: `http://localhost:5000/api-docs`
       "full_name": "Nguyễn Văn A",
       "phone_number": "0901234567",
       "status": "ACTIVE",
-      "is_email_verified": false,
       "created_at": "2026-03-03T10:00:00.000Z"
     },
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -137,7 +136,6 @@ Swagger UI: `http://localhost:5000/api-docs`
       "full_name": "Nguyễn Văn A",
       "phone_number": "0901234567",
       "status": "ACTIVE",
-      "is_email_verified": false,
       "created_at": "2026-03-03T10:00:00.000Z",
       "roles": [
         {
@@ -262,7 +260,6 @@ CREATE TABLE users (
     full_name VARCHAR(100) NOT NULL,
     phone_number VARCHAR(15),
     status ENUM('ACTIVE', 'LOCKED') DEFAULT 'ACTIVE',
-    is_email_verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```

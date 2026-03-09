@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FiCalendar, FiUser, FiTag, FiClock, FiEye } from 'react-icons/fi';
 import '../styles/News.css';
 import Breadcrumb from '../components/Breadcrumb';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { BLOG_API_BASE } from '../config/api';
 
@@ -15,11 +15,33 @@ export default function News() {
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { id } = useParams();
 
   useEffect(() => {
     loadCategories();
-    loadNews();
-  }, []);
+    if (id) {
+      // Nếu có ID từ URL, tải bài viết chi tiết
+      loadNewsDetail(id);
+    } else {
+      // Nếu không có ID, tải danh sách bài viết
+      loadNews();
+    }
+  }, [id]);
+
+  const loadNewsDetail = async (postId) => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_URL}/posts/${postId}`);
+      if (response.data.success) {
+        setSelectedNews(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error loading news detail:", error);
+      loadNews(); // Nếu lỗi, quay lại danh sách
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadCategories = async () => {
     try {
@@ -67,22 +89,21 @@ export default function News() {
   };
 
   const handleReadMore = (news) => {
-    setSelectedNews(news);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    navigate(`/news/${news.post_id}`);
   };
 
   const handleBackToList = () => {
-    setSelectedNews(null);
+    navigate('/news');
   };
   const handleGoBack = () => {
-    window.history.back();
+    navigate('/');
   }
   
 
   return (
     <div className="news-page">
       <div className="news-container">
-        {!selectedNews ? (
+        {!id ? (
           <>
            <button className="back-btn" onClick={handleGoBack}>
               ← Quay lại
@@ -123,7 +144,9 @@ export default function News() {
                   <article key={news.post_id} className="news-card">
                     <div className="news-image">
                       <img 
-                        src={news.thumbnail_url || "https://via.placeholder.com/800x450?text=No+Image"} 
+                        src={news.thumbnail_url 
+                          ? (news.thumbnail_url.startsWith('http') ? news.thumbnail_url : `${API_URL.replace('/api/blog', '')}${news.thumbnail_url}`)
+                          : "https://via.placeholder.com/800x450?text=No+Image"} 
                         alt={news.title} 
                       />
                       <span className="news-category">{news.category_name || "Tin tức"}</span>
@@ -159,7 +182,9 @@ export default function News() {
               </div>
             )}
           </>
-        ) : (
+        ) : loading ? (
+          <div className="news-loading">Đang tải tin tức...</div>
+        ) : selectedNews ? (
           <div className="news-detail">
             <button className="back-btn" onClick={handleBackToList}>
               ← Quay lại danh sách
@@ -183,7 +208,7 @@ export default function News() {
             </div>
             {selectedNews.thumbnail_url && (
               <img 
-                src={selectedNews.thumbnail_url} 
+                src={selectedNews.thumbnail_url.startsWith('http') ? selectedNews.thumbnail_url : `${API_URL.replace('/api/blog', '')}${selectedNews.thumbnail_url}`}
                 alt={selectedNews.title} 
                 className="detail-image" 
               />
@@ -193,6 +218,8 @@ export default function News() {
               dangerouslySetInnerHTML={{ __html: selectedNews.content_html }}
             />
           </div>
+        ) : (
+          <div className="news-empty">Không tìm thấy bài viết</div>
         )}
       </div>
     </div>

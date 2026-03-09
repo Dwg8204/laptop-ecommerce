@@ -5,8 +5,8 @@ const User = {
     create: async (userData) => {
         const { email, password_hash, full_name, phone_number } = userData;
         const [result] = await pool.execute(
-            `INSERT INTO users (email, password_hash, full_name, phone_number, status, is_email_verified) 
-             VALUES (?, ?, ?, ?, 'ACTIVE', FALSE)`,
+            `INSERT INTO users (email, password_hash, full_name, phone_number, status) 
+             VALUES (?, ?, ?, ?, 'ACTIVE')`,
             [email, password_hash, full_name, phone_number]
         );
         return result.insertId;
@@ -24,10 +24,19 @@ const User = {
     // Tìm user theo ID
     findById: async (userId) => {
         const [rows] = await pool.execute(
-            'SELECT user_id, email, full_name, phone_number, status, is_email_verified, created_at FROM users WHERE user_id = ?',
+            'SELECT user_id, email, full_name, phone_number, status, created_at FROM users WHERE user_id = ?',
             [userId]
         );
         return rows[0];
+    },
+
+    // Cập nhật mật khẩu user
+    updatePassword: async (userId, passwordHash) => {
+        const [result] = await pool.execute(
+            'UPDATE users SET password_hash = ? WHERE user_id = ?',
+            [passwordHash, userId]
+        );
+        return result.affectedRows;
     },
 
     // Gán role cho user (mặc định là customer)
@@ -56,8 +65,8 @@ const User = {
             SELECT 
                 CONCAT(
                     CASE 
-                        WHEN r.role_name = 'admin' THEN 'A'
-                        WHEN r.role_name = 'support' THEN 'S'
+                        WHEN LOWER(r.role_name) = 'admin' THEN 'A'
+                        WHEN LOWER(r.role_name) = 'staff' THEN 'N'
                         ELSE 'U'
                     END,
                     LPAD(u.user_id, 3, '0')
@@ -65,11 +74,11 @@ const User = {
                 u.full_name AS name,
                 u.email,
                 u.phone_number AS phone,
-                r.role_name AS role
+                LOWER(r.role_name) AS role
             FROM users u
             INNER JOIN user_roles ur ON u.user_id = ur.user_id
             INNER JOIN roles r ON ur.role_id = r.role_id
-            WHERE r.role_name IN ('admin', 'support')
+            WHERE LOWER(r.role_name) IN ('admin', 'staff')
             ORDER BY u.user_id DESC
         `);
 
