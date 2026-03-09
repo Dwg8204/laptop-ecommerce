@@ -1,8 +1,6 @@
 const Product = require('../models/productModel');
 const Brand = require('../models/brandModel');
 const ProductCategory = require('../models/productCategoryModel');
-
-const uploadProduct = require('../middlewares/uploadProductImageMiddleware');
 const { parseQueryParams, getOffset, buildPaginationResult } = require('../helpers/queryHelper');
 const {
     validateProductData,
@@ -11,6 +9,17 @@ const {
     isValidId,
     VALID_STATUSES
 } = require('../helpers/productValidationHelper');
+
+const toStoredImageUrl = (file) => {
+    if (!file) return null;
+    if (file.path && /^https?:\/\//i.test(file.path)) {
+        return file.path;
+    }
+    if (file.filename) {
+        return `/uploads/products/${file.filename}`;
+    }
+    return file.path || null;
+};
 
 const productController = {
     /**
@@ -91,13 +100,13 @@ const productController = {
     createProduct: async (req, res) => {
         try {
             const {
-                product_name, brand_id, category_id, description_html, highlight_features, sold_quantity,
+                product_name, brand_id, category_id, description_html, highlight_features,
                 screen_size, weight_kg, os,
                 variants: variantsString
             } = req.body;
 
             // 1. Validate Product Data
-            const productErrors = validateProductData({ product_name, brand_id, category_id, description_html, highlight_features, sold_quantity });
+            const productErrors = validateProductData({ product_name, brand_id, category_id, description_html, highlight_features });
             if (productErrors.length > 0) {
                 return res.status(400).json({ success: false, message: 'Lỗi dữ liệu sản phẩm', errors: productErrors });
             }
@@ -121,14 +130,17 @@ const productController = {
 
             const variantsDataForModel = [];
             for (const [index, variant] of variants.entries()) {
+                console.log(`🔍 Validating variant #${index + 1}:`, JSON.stringify(variant, null, 2));
+                
                 const variantErrors = validateVariantData(variant);
                 if (variantErrors.length > 0) {
+                    console.error(`❌ Variant #${index + 1} validation errors:`, variantErrors);
                     return res.status(400).json({ success: false, message: `Lỗi dữ liệu phiên bản #${index + 1}`, errors: variantErrors });
                 }
 
                 // Lấy URL ảnh cho variant này từ req.files
                 const variantImages = req.files && req.files[`variant_${index}_images`]
-                    ? req.files[`variant_${index}_images`].map(file => file.path)
+                    ? req.files[`variant_${index}_images`].map(toStoredImageUrl).filter(Boolean)
                     : [];
                 if (variantImages.length === 0) {
                     return res.status(400).json({ success: false, message: `Phiên bản #${index + 1} yêu cầu ít nhất một ảnh.` });
@@ -140,6 +152,7 @@ const productController = {
                     cpu_benchmark_score: variant.cpu_benchmark_score ? parseInt(variant.cpu_benchmark_score) : null,
                     gpu: variant.gpu || null,
                     ram_gb: parseInt(variant.ram_gb),
+                    ram_type: variant.ram_type || null,
                     storage_gb: parseInt(variant.storage_gb),
                     color_name: variant.color_name,
                     original_price: parseFloat(variant.original_price),
@@ -165,8 +178,7 @@ const productController = {
                 brand_id: parseInt(brand_id),
                 category_id: parseInt(category_id),
                 description_html: description_html || null,
-                highlight_features: highlight_features || null,
-                sold_quantity: sold_quantity ? parseInt(sold_quantity) : 0
+                highlight_features: highlight_features || null
             };
 
             const specData = {
@@ -176,7 +188,7 @@ const productController = {
             };
 
             const productLevelImageUrls = req.files && req.files['productImages']
-                ? req.files['productImages'].map(file => file.path)
+                ? req.files['productImages'].map(toStoredImageUrl).filter(Boolean)
                 : [];
 
             if (productLevelImageUrls.length === 0) {
@@ -202,7 +214,51 @@ const productController = {
             });
         } catch (error) {
             console.error('Lỗi khi thêm sản phẩm:', error);
-            res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
+
+            if (error.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Dữ liệu bị trùng (SKU hoặc ràng buộc unique ảnh chính). Vui lòng kiểm tra lại SKU và cấu trúc index bảng product_images.'
+                });
+            }
+
+            if (error.code === 'ER_BAD_FIELD_ERROR') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cấu trúc cột trong database chưa khớp với code hiện tại.',
+                    error: error.message
+                });
+            }
+
+            if (error.code === 'ER_BAD_NULL_ERROR') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Dữ liệu bắt buộc đang bị null khi lưu vào database.',
+                    error: error.message
+                });
+            }
+
+            if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Dữ liệu tham chiếu không tồn tại (brand/category hoặc foreign key liên quan).'
+                });
+            }
+
+            if (error.code === 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Giá trị truyền vào không đúng định dạng cột trong database.',
+                    error: error.message
+                });
+            }
+
+            res.status(500).json({
+                success: false,
+                message: 'Lỗi máy chủ nội bộ',
+                error_code: error.code || null,
+                error: error.sqlMessage || error.message || null
+            });
         }
     },
 
@@ -226,7 +282,7 @@ const productController = {
             }
 
             const {
-                product_name, brand_id, category_id, description_html, highlight_features, sold_quantity,
+                product_name, brand_id, category_id, description_html, highlight_features,
                 screen_size, weight_kg, os,
                 delete_image_ids: deleteImageIdsString,
                 primary_product_image_id,
@@ -235,7 +291,7 @@ const productController = {
             } = req.body;
 
             // 1. Validate Product Data
-            const productErrors = validateProductData({ product_name, brand_id, category_id, description_html, highlight_features, sold_quantity }, true);
+            const productErrors = validateProductData({ product_name, brand_id, category_id, description_html, highlight_features }, true);
             if (productErrors.length > 0) {
                 return res.status(400).json({ success: false, message: 'Lỗi dữ liệu sản phẩm', errors: productErrors });
             }
@@ -272,8 +328,7 @@ const productController = {
                 brand_id: brand_id ? parseInt(brand_id) : undefined,
                 category_id: category_id ? parseInt(category_id) : undefined,
                 description_html,
-                highlight_features,
-                sold_quantity: sold_quantity ? parseInt(sold_quantity) : undefined
+                highlight_features
             };
 
             const specData = {
@@ -304,7 +359,7 @@ const productController = {
 
 
             const newProductLevelImageUrls = req.files && req.files['newProductImages']
-                ? req.files['newProductImages'].map(file => file.path)
+                ? req.files['newProductImages'].map(toStoredImageUrl).filter(Boolean)
                 : [];
 
             let variantsToUpdate = [];
@@ -321,7 +376,7 @@ const productController = {
                         }
 
                         const newVariantImageUrls = req.files && req.files[`newVariant_${index}_images_update`]
-                            ? req.files[`newVariant_${index}_images_update`].map(file => file.path)
+                            ? req.files[`newVariant_${index}_images_update`].map(toStoredImageUrl).filter(Boolean)
                             : [];
                         let deleteVariantImageIds = [];
                         if (variant.delete_image_ids) {
@@ -346,6 +401,7 @@ const productController = {
                                 cpu_benchmark_score: variant.data.cpu_benchmark_score ? parseInt(variant.data.cpu_benchmark_score) : undefined,
                                 gpu: variant.data.gpu,
                                 ram_gb: variant.data.ram_gb ? parseInt(variant.data.ram_gb) : undefined,
+                                ram_type: variant.data.ram_type,
                                 storage_gb: variant.data.storage_gb ? parseInt(variant.data.storage_gb) : undefined,
                                 color_name: variant.data.color_name,
                                 original_price: variant.data.original_price ? parseFloat(variant.data.original_price) : undefined,
@@ -373,7 +429,7 @@ const productController = {
                             return res.status(400).json({ success: false, message: `Lỗi dữ liệu phiên bản tạo mới #${index + 1}`, errors: variantErrors });
                         }
                         const newVariantImageUrls = req.files && req.files[`newVariant_${index}_images_create`]
-                            ? req.files[`newVariant_${index}_images_create`].map(file => file.path)
+                            ? req.files[`newVariant_${index}_images_create`].map(toStoredImageUrl).filter(Boolean)
                             : [];
                         if (newVariantImageUrls.length === 0) {
                             return res.status(400).json({ success: false, message: `Phiên bản tạo mới #${index + 1} yêu cầu ít nhất một ảnh.` });
@@ -384,6 +440,7 @@ const productController = {
                             cpu_benchmark_score: variant.cpu_benchmark_score ? parseInt(variant.cpu_benchmark_score) : null,
                             gpu: variant.gpu || null,
                             ram_gb: parseInt(variant.ram_gb),
+                            ram_type: variant.ram_type || null,
                             storage_gb: parseInt(variant.storage_gb),
                             color_name: variant.color_name,
                             original_price: parseFloat(variant.original_price),

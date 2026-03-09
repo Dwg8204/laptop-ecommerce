@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(100) NOT NULL,
     phone_number VARCHAR(15),
     status ENUM('ACTIVE', 'LOCKED') DEFAULT 'ACTIVE',
-    is_email_verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

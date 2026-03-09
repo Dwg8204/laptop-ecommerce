@@ -13,7 +13,7 @@ const VALID_STATUSES = ['IN_STOCK', 'OUT_OF_STOCK', 'COMING_SOON', 'DISCONTINUED
 const validateProductData = (data, isUpdate = false) => {
     const {
         product_name, brand_id, category_id,
-        description_html, highlight_features, sold_quantity
+        description_html, highlight_features
     } = data;
     const errors = [];
 
@@ -33,9 +33,6 @@ const validateProductData = (data, isUpdate = false) => {
     }
     if (category_id !== undefined && (isNaN(parseInt(category_id)) || parseInt(category_id) <= 0)) {
         errors.push('ID danh mục không hợp lệ.');
-    }
-    if (sold_quantity !== undefined && (isNaN(parseInt(sold_quantity)) || parseInt(sold_quantity) < 0)) {
-        errors.push('Số lượng đã bán phải là số nguyên không âm.');
     }
     // description_html và highlight_features có thể là null hoặc chuỗi rỗng, không cần validate chặt chẽ
     return errors;

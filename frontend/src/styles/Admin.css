@@ -544,6 +544,63 @@
 .adm-money{ font-weight: 900; color: #1d4ed8; }
 .adm-ellipsis{ max-width: 340px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* AdminBranch */
+.adm-branch-logo-preview{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.adm-branch-logo-preview img{
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 4px;
+}
+
+.adm-branch-logo-preview span{
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.adm-branch-stats{
+  margin-top: 12px;
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.adm-branch-logo{
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 4px;
+}
+
+.adm-branch-url{
+  max-width: 260px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adm-branch-empty-cell{
+  text-align:center;
+  color: var(--muted);
+  padding: 20px 12px;
+}
+
 /* Content comments */
 .adm-comment-list{
   list-style:none;
@@ -594,6 +651,7 @@
   .adm-span{ grid-column: span 1; }
   .adm-form-compact{ grid-template-columns: 1fr; }
   .adm-kpi-grid{ grid-template-columns: 1fr; }
+  .adm-branch-stats{ grid-template-columns: 1fr; }
   .adm-topbar{ flex-direction: column; align-items: flex-start; }
   .adm-userbox{ width: 100%; }
 }

@@ -120,8 +120,7 @@ const Product = {
         const allowedSortFields = {
             'price': 'min_price',
             'name': 'p.product_name',
-            'created_at': 'p.created_at',
-            'sold_quantity': 'p.sold_quantity'
+            'created_at': 'p.created_at'
         };
         const { safeSortBy, safeSortOrder } = getSafeSort(options.sortBy, options.sortOrder, allowedSortFields, 'p.created_at');
         query += ` ORDER BY ${safeSortBy} ${safeSortOrder}`;
@@ -449,7 +448,7 @@ const Product = {
             let affectedTotalRows = 0;
 
             // 1. Cập nhật thông tin sản phẩm
-            const allowedProductFields = ['product_name', 'brand_id', 'category_id', 'description_html', 'highlight_features', 'sold_quantity'];
+            const allowedProductFields = ['product_name', 'brand_id', 'category_id', 'description_html', 'highlight_features'];
             const productFieldsToUpdate = [];
             const productValues = [];
 

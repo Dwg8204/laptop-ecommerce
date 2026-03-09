@@ -24,10 +24,6 @@ properties:
       - LOCKED
     description: Trạng thái tài khoản
     example: ACTIVE
-  is_email_verified:
-    type: boolean
-    description: Email đã xác thực chưa
-    example: false
   created_at:
     type: string
     format: date-time

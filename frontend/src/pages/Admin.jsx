@@ -2,6 +2,9 @@ import { useMemo, useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { useProducts } from "../context/ProductContext"
+import * as brandApi from "../services/brandApi"
+import * as categoryApi from "../services/categoryApi"
+import { buildApiUrl } from "../config/api"
 import {
   FiBarChart2,
   FiBox,
@@ -19,6 +22,7 @@ import {
   FiTrash2,
   FiUsers,
   FiBookOpen,
+  FiImage,
 } from "react-icons/fi"
 import "../styles/Admin.css"
 
@@ -33,17 +37,20 @@ import AdminRecommendation from "../components/admin/AdminRecommendation"
 import AdminAssistant from "../components/admin/AdminAssistant"
 import AdminStaff from "../components/admin/AdminStaff"
 import OrderDetailModal from "../components/admin/OrderDetailModal"
-import AdminNews from "../components/admin/AdminNewsAPI"  
-import { buildApiUrl } from "../config/api"
+import AdminNews from "../components/admin/AdminNewsAPI"
+import AdminSliderAPI from "../components/admin/AdminSliderAPI"
+import AdminBranch from "../components/admin/AdminBranch"
 
 const moduleItems = [
   { id: "dashboard", label: "Dashboard", icon: FiBarChart2 },
   { id: "products", label: "Sản phẩm", icon: FiPackage },
+  { id: "branch", label: "Quản lý thương hiệu", icon: FiList },
   { id: "inventory", label: "Tồn kho", icon: FiBox },
   { id: "orders", label: "Đơn hàng", icon: FiClipboard },
   { id: "customers", label: "Khách hàng", icon: FiUsers },
   { id: "content", label: "Nội dung & đánh giá", icon: FiFileText },
   { id: "documentation", label: "Quản lý tin tức", icon: FiBookOpen },
+  { id: "sliders", label: "Quản lý Banner", icon: FiImage },
   { id: "recommendation", label: "Gợi ý sản phẩm", icon: FiCpu },
   { id: "assistant", label: "Trợ lý AI", icon: FiHeadphones },
   { id: "staff", label: "Người dùng hệ thống", icon: FiSettings },
@@ -83,7 +90,7 @@ const initialAiLogs = [
 
 const initialStaff = [
   { id: "S001", name: "Admin Tổng", role: "admin", email: "admin@laptopshop.vn" },
-  { id: "S002", name: "Nhân viên kho", role: "warehouse", email: "kho@laptopshop.vn" },
+  { id: "S002", name: "Nhân viên hệ thống", role: "staff", email: "staff@laptopshop.vn" },
 ]
 
 const toCurrency = (value) => `${value.toLocaleString("vi-VN")}đ`
@@ -102,21 +109,24 @@ export default function Admin() {
   const [productForm, setProductForm] = useState({
     name: "",
     brand: "",
+    brand_id: "",
     price: "",
     oldPrice: "",
     storage: "",
     ram: "",
+    ramType: "",
     cpu: "",
     screenSize: "",
-    resolution: "",
+    weightKg: "",
+    os: "",
     graphics: "",
     features: [],
     hasAI: false,
     series: "",
+    category_id: "",
     stock: "",
-    config: "",
-    specs: "",
     image: "",
+    imageFile: null,
     discount: "",
     installment: "Trả góp 0%",
     newArrival: false,
@@ -137,9 +147,15 @@ export default function Admin() {
   const [aiTrainingNote, setAiTrainingNote] = useState("Bổ sung dữ liệu khuyến mãi tháng 3")
 
   const [staffUsers, setStaffUsers] = useState(initialStaff)
-  const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "", password: "", role: "support" })
+  const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "", password: "", role: "staff" })
   const [searchTerm, setSearchTerm] = useState("")
   const [loadingStaff, setLoadingStaff] = useState(false)
+  
+  // Brands and Categories for product form
+  const [brands, setBrands] = useState([])
+  const [categories, setCategories] = useState([])
+  const [loadingBrands, setLoadingBrands] = useState(false)
+  const [loadingCategories, setLoadingCategories] = useState(false)
 
   // Fetch staff users từ API khi vào module "staff"
   useEffect(() => {
@@ -147,6 +163,39 @@ export default function Admin() {
       fetchStaffUsers()
     }
   }, [activeModule])
+
+  // Fetch brands and categories when component mounts
+  useEffect(() => {
+    fetchBrandsAndCategories()
+  }, [])
+
+  const fetchBrandsAndCategories = async () => {
+    // Fetch brands
+    try {
+      setLoadingBrands(true)
+      const brandsResponse = await brandApi.getAllBrands()
+      if (brandsResponse.success && brandsResponse.data) {
+        setBrands(brandsResponse.data)
+      }
+    } catch (error) {
+      console.error("Error fetching brands:", error)
+    } finally {
+      setLoadingBrands(false)
+    }
+
+    // Fetch categories
+    try {
+      setLoadingCategories(true)
+      const categoriesResponse = await categoryApi.getAllCategories()
+      if (categoriesResponse.success && categoriesResponse.data) {
+        setCategories(categoriesResponse.data)
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error)
+    } finally {
+      setLoadingCategories(false)
+    }
+  }
 
   const fetchStaffUsers = async () => {
     setLoadingStaff(true)
@@ -232,60 +281,96 @@ export default function Admin() {
     return { interactions, conversions, conversionRate }
   }, [aiLogs])
 
-  const handleProductSubmit = (event) => {
+  const handleProductSubmit = async (event) => {
     event.preventDefault()
+
+    // Validate brand and category selection
+    if (!productForm.brand_id || productForm.brand_id === '') {
+      alert('Vui lòng chọn thương hiệu')
+      return
+    }
+    if (!productForm.category_id || productForm.category_id === '') {
+      alert('Vui lòng chọn danh mục')
+      return
+    }
+    if (!editingProductId && !productForm.imageFile) {
+      alert('Vui lòng upload hình ảnh sản phẩm')
+      return
+    }
+
+    const autoConfig = `${productForm.ram}${productForm.ramType ? ` ${productForm.ramType}` : ""} | ${productForm.storage} | ${productForm.screenSize}`
+    const autoSpecs = `${productForm.cpu} | ${productForm.graphics} | ${productForm.os}${productForm.weightKg ? ` | ${productForm.weightKg} kg` : ""}`
 
     const payload = {
       name: productForm.name,
       brand: productForm.brand,
+      brand_id: productForm.brand_id, // Pass brand_id for API
+      category_id: productForm.category_id, // Pass category_id for API
       price: Number(productForm.price),
       oldPrice: Number(productForm.oldPrice || productForm.price),
       storage: productForm.storage,
       ram: productForm.ram,
+      ramType: productForm.ramType,
       cpu: productForm.cpu,
       screenSize: productForm.screenSize,
-      resolution: productForm.resolution,
+      weightKg: productForm.weightKg,
+      os: productForm.os,
       graphics: productForm.graphics,
       features: productForm.features,
       hasAI: productForm.hasAI,
       series: productForm.series,
       stock: Number(productForm.stock),
-      config: productForm.config,
-      specs: productForm.specs,
+      config: autoConfig,
+      specs: autoSpecs,
       image: productForm.image || "https://cdn2.cellphones.com.vn/insecure/rs:fill:0:358/q:90/plain/https://cellphones.com.vn/media/catalog/product/t/e/text_ng_n_10__5_117.png",
       discount:
         productForm.discount ||
         `Giảm ${Math.round(((Number(productForm.oldPrice) - Number(productForm.price)) / Number(productForm.oldPrice)) * 100)}%`,
       installment: productForm.installment,
       newArrival: productForm.newArrival,
+      // Add file objects for API upload
+      productImages: productForm.imageFile, // File object
+      variantImages: productForm.imageFile ? [productForm.imageFile] : [], // Single file for variant images
     }
 
-    if (editingProductId) updateProduct(editingProductId, payload)
-    else addProduct(payload)
+    try {
+      if (editingProductId) {
+        await updateProduct(editingProductId, payload)
+      } else {
+        await addProduct(payload)
+      }
 
-    setProductForm({
-      name: "",
-      brand: "",
-      price: "",
-      oldPrice: "",
-      storage: "",
-      ram: "",
-      cpu: "",
-      screenSize: "",
-      resolution: "",
-      graphics: "",
-      features: [],
-      hasAI: false,
-      series: "",
-      stock: "",
-      config: "",
-      specs: "",
-      image: "",
-      discount: "",
-      installment: "Trả góp 0%",
-      newArrival: false,
-    })
-    setEditingProductId("")
+      // Clear form on success
+      setProductForm({
+        name: "",
+        brand: "",
+        brand_id: "",
+        price: "",
+        oldPrice: "",
+        storage: "",
+        ram: "",
+        ramType: "",
+        cpu: "",
+        screenSize: "",
+        weightKg: "",
+        os: "",
+        graphics: "",
+        features: [],
+        hasAI: false,
+        series: "",
+        category_id: "",
+        stock: "",
+        image: "",
+        imageFile: null,
+        discount: "",
+        installment: "Trả góp 0%",
+        newArrival: false,
+      })
+      setEditingProductId("")
+    } catch (error) {
+      console.error('Error submitting product:', error)
+      alert(`Lỗi: ${error.message}`)
+    }
   }
 
   const handleEditProduct = (product) => {
@@ -297,16 +382,16 @@ export default function Admin() {
       oldPrice: String(product.oldPrice || product.price),
       storage: product.storage,
       ram: product.ram,
+      ramType: product.ramType || "",
       cpu: product.cpu,
       screenSize: product.screenSize,
-      resolution: product.resolution,
+      weightKg: product.weightKg || "",
+      os: product.os || "",
       graphics: product.graphics,
       features: product.features || [],
       hasAI: product.hasAI || false,
       series: product.series,
       stock: String(product.stock),
-      config: product.config,
-      specs: product.specs,
       image: product.image,
       discount: product.discount,
       installment: product.installment || "Trả góp 0%",
@@ -391,6 +476,13 @@ export default function Admin() {
       return
     }
 
+    const normalizedEmail = newStaff.email.trim().toLowerCase()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(normalizedEmail)) {
+      alert("Email không hợp lệ. Vui lòng nhập đúng định dạng, ví dụ: user@example.com")
+      return
+    }
+
     try {
       const token = localStorage.getItem("token")
       const response = await fetch(buildApiUrl("/api/auth/admin/users"), {
@@ -401,7 +493,7 @@ export default function Admin() {
         },
         body: JSON.stringify({
           name: newStaff.name,
-          email: newStaff.email,
+          email: normalizedEmail,
           phone: newStaff.phone,
           password: newStaff.password,
           role: newStaff.role
@@ -414,7 +506,7 @@ export default function Admin() {
         // Reload danh sách nhân viên từ API
         await fetchStaffUsers()
         // Reset form
-        setNewStaff({ name: "", email: "", phone: "", password: "", role: "support" })
+        setNewStaff({ name: "", email: "", phone: "", password: "", role: "staff" })
         alert("✅ Tạo tài khoản nhân viên thành công")
         console.log("✅ Nhân viên mới:", data.data)
       } else {
@@ -443,8 +535,13 @@ export default function Admin() {
         handleProductSubmit={handleProductSubmit}
         handleEditProduct={handleEditProduct}
         handleDeleteProduct={handleDeleteProduct}
+        brands={brands}
+        categories={categories}
+        loadingBrands={loadingBrands}
+        loadingCategories={loadingCategories}
       />
     )
+    if (activeModule === "branch") return <AdminBranch />
     if (activeModule === "inventory") return (
       <AdminInventory 
         products={products}
@@ -478,6 +575,7 @@ export default function Admin() {
       />
     )
     if (activeModule === "documentation") return <AdminNews />
+    if (activeModule === "sliders") return <AdminSliderAPI />
     if (activeModule === "recommendation") return (
       <AdminRecommendation 
         recommendationStats={recommendationStats}
@@ -493,18 +591,33 @@ export default function Admin() {
         setAiTrainingNote={setAiTrainingNote}
       />
     )
-    if (activeModule === "staff") return (
+    if (activeModule === "staff") {
+      if (user?.role !== "admin") {
+        return (
+          <div className="adm-empty-card" style={{ marginTop: 8 }}>
+            <h2>Không có quyền truy cập</h2>
+            <p>Nhân viên không được phép sử dụng chức năng Người dùng hệ thống.</p>
+          </div>
+        )
+      }
+
+      return (
       <AdminStaff 
         staffUsers={staffUsers}
         newStaff={newStaff}
         setNewStaff={setNewStaff}
         createStaff={createStaff}
       />
-    )
+      )
+    }
     return null
   }
 
-  const activeLabel = moduleItems.find((item) => item.id === activeModule)?.label
+  const visibleModuleItems = user?.role === "admin"
+    ? moduleItems
+    : moduleItems.filter((item) => item.id !== "staff")
+
+  const activeLabel = visibleModuleItems.find((item) => item.id === activeModule)?.label || "Dashboard"
 
   if (loading) {
     return (
@@ -539,7 +652,7 @@ export default function Admin() {
           <h2>Không có quyền truy cập</h2>
           <p>
             Bạn không có quyền truy cập vào trang quản trị.<br />
-            Chỉ tài khoản Admin, Nhân viên kho hoặc Nhân viên bán hàng mới có thể truy cập.
+            Chỉ tài khoản Admin hoặc Nhân viên mới có thể truy cập.
           </p>
           <button className="adm-btn adm-btn-primary" onClick={() => navigate("/")}>Về trang chủ</button>
         </div>
@@ -559,7 +672,7 @@ export default function Admin() {
         </div>
 
         <nav className="adm-nav">
-          {moduleItems.map((item) => {
+          {visibleModuleItems.map((item) => {
             const Icon = item.icon
             return (
               <button
@@ -585,7 +698,7 @@ export default function Admin() {
             <div className="adm-user-meta">
               <div className="adm-user-name">{user?.name}</div>
               <div className="adm-user-role">
-                {user?.role === "admin" ? "Admin" : user?.role === "warehouse" ? "Kho" : "Bán hàng"}
+                {user?.role === "admin" ? "Admin" : "Nhân viên"}
               </div>
             </div>
           </div>

@@ -54,7 +54,6 @@ npm run dev
 ```
 
 6. Click **"Execute"**
-7. Xem Response:
 
 ```json
 {
@@ -67,7 +66,6 @@ npm run dev
       "full_name": "Nguyễn Văn Test",
       "phone_number": "0901234567",
       "status": "ACTIVE",
-      "is_email_verified": false,
       "created_at": "2026-03-03T..."
     },
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."

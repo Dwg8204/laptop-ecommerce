@@ -64,7 +64,7 @@ export default function Header() {
 
       {/* Main Header */}
       <header style={styles.header}>
-        <div style={styles.logo}>LaptopShop</div>
+        <div style={styles.logo} onClick={() => navigate('/')}>LaptopShop</div>
 
         <button style={styles.categoryBtn}>
           <FiList size={24} />

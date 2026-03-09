@@ -4,7 +4,8 @@ const authAdminController = require('../controllers/authAdminController');
 
 /**
  * @route GET /api/auth/admin/users
- * @description Lấy danh sách người dùng hệ thống (admin, support, sales, warehouse)
+ * @description Lấy danh sách người dùng hệ thống (admin, staff)
+ * @role admin only
  */
 router.get('/users', authAdminController.getSystemUsers);
 

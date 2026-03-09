@@ -1,28 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react"
-import { 
-  FiPlus, 
-  FiEdit2, 
-  FiTrash2, 
-  FiEye, 
-  FiEyeOff, 
-  FiSave, 
-  FiX, 
-  FiImage,
-  FiTag,
-  FiSearch,
-  FiFilter,
-  FiMoreVertical,
-  FiFile,
-  FiCheckCircle,
-  FiClock,
-  FiCalendar
-} from "react-icons/fi"
 import "../../styles/Admin.css"
 
 /**
- * AdminNews - Quản lý tin tức 
+ * Frontend-first AdminNews
  * - Lưu mock data vào localStorage
- * - Field names bám theo schema MySQL:
+ * - Field names bám theo schema MySQL của bạn:
  *   blog_categories(category_id, category_name, description, created_at)
  *   blog_posts(post_id, category_id, author_id, title, thumbnail_url, content_html,
  *              view_count, status, published_at)
@@ -90,7 +72,7 @@ const seedPosts = [
   },
 ]
 
-function AdminNews() {
+export default function AdminNews() {
   // ===== DATA =====
   const [categories, setCategories] = useState([])
   const [posts, setPosts] = useState([])
@@ -323,278 +305,24 @@ function AdminNews() {
   }
 
   return (
-    <div className="adm-news-container">
-      {/* Header Section */}
-      <div className="adm-news-header">
-        <div className="adm-news-header-content">
-          <div className="adm-news-title-group">
-            <h2 className="adm-news-title">
-              <FiFile className="adm-news-title-icon" />
-              Quản lý Tin tức
-            </h2>
-            <p className="adm-news-subtitle">
-              Tạo, chỉnh sửa và quản lý các bài viết tin tức
-            </p>
-          </div>
-          <button 
-            className="adm-btn-create"
-            onClick={resetPostForm}
-          >
-            <FiPlus /> Tạo bài viết mới
-          </button>
-        </div>
+    <div className="adm-grid">
+      {/* ========== POST FORM ========== */}
+      <section className="adm-card adm-card-pad">
+        <h3 style={{ marginTop: 0 }}>{editingPostId ? `Sửa bài viết #${editingPostId}` : "Quản lý tin tức"}</h3>
+        <p style={{ marginTop: 6, color: "#666" }}>
+          Tạo / sửa / đăng / ẩn bài viết. (Đang mock bằng localStorage, sẽ nối API sau)
+        </p>
 
-        {/* Stats Cards */}
-        <div className="adm-news-stats">
-          <div className="adm-stat-card">
-            <div className="adm-stat-icon adm-stat-primary">
-              <FiFile />
-            </div>
-            <div className="adm-stat-info">
-              <div className="adm-stat-value">{posts.length}</div>
-              <div className="adm-stat-label">Tổng bài viết</div>
-            </div>
-          </div>
-          <div className="adm-stat-card">
-            <div className="adm-stat-icon adm-stat-success">
-              <FiCheckCircle />
-            </div>
-            <div className="adm-stat-info">
-              <div className="adm-stat-value">
-                {posts.filter(p => p.status === 'PUBLISHED').length}
-              </div>
-              <div className="adm-stat-label">Đã đăng</div>
-            </div>
-          </div>
-          <div className="adm-stat-card">
-            <div className="adm-stat-icon adm-stat-warning">
-              <FiClock />
-            </div>
-            <div className="adm-stat-info">
-              <div className="adm-stat-value">
-                {posts.filter(p => p.status === 'DRAFT').length}
-              </div>
-              <div className="adm-stat-label">Bản nháp</div>
-            </div>
-          </div>
-          <div className="adm-stat-card">
-            <div className="adm-stat-icon adm-stat-muted">
-              <FiEyeOff />
-            </div>
-            <div className="adm-stat-info">
-              <div className="adm-stat-value">
-                {posts.filter(p => p.status === 'HIDDEN').length}
-              </div>
-              <div className="adm-stat-label">Đã ẩn</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="adm-news-layout">
-        {/* Sidebar - Form và Categories */}
-        <aside className="adm-news-sidebar">
-          {/* Post Form Card */}
-          <div className="adm-news-card">
-            <div className="adm-news-card-header">
-              <h3 className="adm-news-card-title">
-                {editingPostId ? (
-                  <>
-                    <FiEdit2 /> Chỉnh sửa bài viết
-                  </>
-                ) : (
-                  <>
-                    <FiPlus /> Tạo bài viết mới
-                  </>
-                )}
-              </h3>
-              {editingPostId && (
-                <button 
-                  className="adm-btn-icon"
-                  onClick={resetPostForm}
-                  title="Hủy chỉnh sửa"
-                >
-                  <FiX />
-                </button>
-              )}
-            </div>
-            
-            <form onSubmit={(e) => handleSubmitPost(e)} className="adm-news-form">
-              <div className="adm-form-group">
-                <label className="adm-form-label">
-                  <FiTag /> Danh mục
-                </label>
-                <select
-                  className="adm-form-select"
-                  value={postForm.category_id}
-                  onChange={(e) => setPostForm((p) => ({ ...p, category_id: e.target.value }))}
-                  required
-                >
-                  <option value="">-- Chọn danh mục --</option>
-                  {categories.map((c) => (
-                    <option key={c.category_id} value={c.category_id}>
-                      {c.category_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="adm-form-group">
-                <label className="adm-form-label">Tiêu đề</label>
-                <input
-                  type="text"
-                  className="adm-form-input"
-                  value={postForm.title}
-                  onChange={(e) => setPostForm((p) => ({ ...p, title: e.target.value }))}
-                  placeholder="Nhập tiêu đề bài viết..."
-                  required
-                />
-              </div>
-
-              <div className="adm-form-group">
-                <label className="adm-form-label">
-                  <FiImage /> URL hình ảnh
-                </label>
-                <input
-                  type="url"
-                  className="adm-form-input"
-                  value={postForm.thumbnail_url}
-                  onChange={(e) => setPostForm((p) => ({ ...p, thumbnail_url: e.target.value }))}
-                  placeholder="https://example.com/image.jpg"
-                />
-                {postForm.thumbnail_url && (
-                  <div className="adm-image-preview">
-                    <img 
-                      src={postForm.thumbnail_url} 
-                      alt="Preview"
-                      onError={(e) => e.target.style.display = 'none'}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="adm-form-group">
-                <label className="adm-form-label">Nội dung (HTML)</label>
-                <textarea
-                  className="adm-form-textarea"
-                  rows={8}
-                  value={postForm.content_html}
-                  onChange={(e) => setPostForm((p) => ({ ...p, content_html: e.target.value }))}
-                  placeholder="<p>Nội dung bài viết...</p>"
-                  required
-                />
-              </div>
-
-              <div className="adm-form-group">
-                <label className="adm-form-label">Trạng thái</label>
-                <select
-                  className="adm-form-select"
-                  value={postForm.status}
-                  onChange={(e) => setPostForm((p) => ({ ...p, status: e.target.value }))}
-                >
-                  <option value="DRAFT">Bản nháp</option>
-                  <option value="PUBLISHED">Đã đăng</option>
-                  <option value="HIDDEN">Ẩn</option>
-                </select>
-              </div>
-
-              <div className="adm-form-actions">
-                <button 
-                  type="button" 
-                  className="adm-btn-secondary"
-                  onClick={(e) => handleSubmitPost(e, "DRAFT")}
-                >
-                  <FiSave /> Lưu nháp
-                </button>
-                <button 
-                  type="button" 
-                  className="adm-btn-primary"
-                  onClick={(e) => handleSubmitPost(e, "PUBLISHED")}
-                >
-                  <FiCheckCircle /> {editingPostId ? 'Cập nhật' : 'Đăng bài'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* Categories Management */}
-          <div className="adm-news-card">
-            <div className="adm-news-card-header">
-              <h3 className="adm-news-card-title">
-                <FiTag /> Danh mục
-              </h3>
-            </div>
-            
-            <form onSubmit={handleCreateCategory} className="adm-news-form">
-              <div className="adm-form-group">
-                <input
-                  type="text"
-                  className="adm-form-input"
-                  value={newCategory.category_name}
-                  onChange={(e) => setNewCategory((p) => ({ ...p, category_name: e.target.value }))}
-                  placeholder="Tên danh mục..."
-                />
-              </div>
-              <div className="adm-form-group">
-                <input
-                  type="text"
-                  className="adm-form-input"
-                  value={newCategory.description}
-                  onChange={(e) => setNewCategory((p) => ({ ...p, description: e.target.value }))}
-                  placeholder="Mô tả..."
-                />
-              </div>
-              <button type="submit" className="adm-btn-block">
-                <FiPlus /> Thêm danh mục
-              </button>
-            </form>
-
-            <div className="adm-category-list">
-              {categories.map((c) => (
-                <div key={c.category_id} className="adm-category-item">
-                  <div className="adm-category-badge">{c.category_name}</div>
-                  {c.description && (
-                    <div className="adm-category-desc">{c.description}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content - Posts List */}
-        <main className="adm-news-main">
-          {/* Filters */}
-          <div className="adm-news-filters">
-            <div className="adm-search-box">
-              <FiSearch className="adm-search-icon" />
-              <input
-                type="text"
-                className="adm-search-input"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Tìm kiếm bài viết..."
-              />
-            </div>
-
-            <div className="adm-filter-row">
-              <select 
-                className="adm-filter-select"
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)}
+        <form onSubmit={(e) => handleSubmitPost(e)} style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <label className="adm-label">Danh mục</label>
+              <select
+                className="adm-input"
+                value={postForm.category_id}
+                onChange={(e) => setPostForm((p) => ({ ...p, category_id: e.target.value }))}
               >
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="DRAFT">Bản nháp</option>
-                <option value="PUBLISHED">Đã đăng</option>
-                <option value="HIDDEN">Đã ẩn</option>
-              </select>
-
-              <select 
-                className="adm-filter-select"
-                value={categoryFilter} 
-                onChange={(e) => setCategoryFilter(e.target.value)}
-              >
-                <option value="ALL">Tất cả danh mục</option>
+                <option value="">-- Chọn danh mục --</option>
                 {categories.map((c) => (
                   <option key={c.category_id} value={c.category_id}>
                     {c.category_name}
@@ -602,124 +330,219 @@ function AdminNews() {
                 ))}
               </select>
             </div>
+
+            <div>
+              <label className="adm-label">Trạng thái</label>
+              <select
+                className="adm-input"
+                value={postForm.status}
+                onChange={(e) => setPostForm((p) => ({ ...p, status: e.target.value }))}
+              >
+                <option value="DRAFT">DRAFT (Nháp)</option>
+                <option value="PUBLISHED">PUBLISHED (Đã đăng)</option>
+                <option value="HIDDEN">HIDDEN (Ẩn)</option>
+              </select>
+            </div>
           </div>
 
-          {/* Posts Grid */}
-          <div className="adm-posts-grid">
-            {filteredPosts.length === 0 ? (
-              <div className="adm-empty-state">
-                <FiFile className="adm-empty-icon" />
-                <p className="adm-empty-text">Không tìm thấy bài viết nào</p>
-                <p className="adm-empty-subtext">
-                  Thử thay đổi bộ lọc hoặc tạo bài viết mới
-                </p>
-              </div>
-            ) : (
-              filteredPosts.map((post) => {
-                const cat = categoryMap.get(String(post.category_id))?.category_name || "Không rõ"
-                const updated = post.updated_at || post.published_at
-                
-                return (
-                  <article key={post.post_id} className="adm-post-card">
-                    {/* Thumbnail */}
-                    <div className="adm-post-thumbnail">
-                      {post.thumbnail_url ? (
-                        <img 
-                          src={post.thumbnail_url} 
-                          alt={post.title}
-                          onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/400x250?text=No+Image'
-                          }}
-                        />
-                      ) : (
-                        <div className="adm-post-no-image">
-                          <FiImage />
+          <div>
+            <label className="adm-label">Tiêu đề</label>
+            <input
+              className="adm-input"
+              value={postForm.title}
+              onChange={(e) => setPostForm((p) => ({ ...p, title: e.target.value }))}
+              placeholder="Nhập tiêu đề bài viết..."
+            />
+          </div>
+
+          <div>
+            <label className="adm-label">Thumbnail URL</label>
+            <input
+              className="adm-input"
+              value={postForm.thumbnail_url}
+              onChange={(e) => setPostForm((p) => ({ ...p, thumbnail_url: e.target.value }))}
+              placeholder="https://..."
+            />
+          </div>
+
+          <div>
+            <label className="adm-label">Nội dung (HTML)</label>
+            <textarea
+              className="adm-input"
+              rows={10}
+              style={{ resize: "vertical" }}
+              value={postForm.content_html}
+              onChange={(e) => setPostForm((p) => ({ ...p, content_html: e.target.value }))}
+              placeholder="<p>Nội dung bài viết...</p>"
+            />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              <button className="adm-btn" type="button" onClick={(e) => handleSubmitPost(e, "DRAFT")}>
+                Lưu nháp
+              </button>
+              <button className="adm-btn adm-btn-primary" type="button" onClick={(e) => handleSubmitPost(e, "PUBLISHED")}>
+                Đăng bài
+              </button>
+              {editingPostId ? (
+                <button className="adm-btn" type="submit">
+                  Cập nhật
+                </button>
+              ) : null}
+              <button className="adm-btn" type="button" onClick={resetPostForm}>
+                Làm mới
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      {/* ========== CATEGORY MANAGER ========== */}
+      <section className="adm-card adm-card-pad">
+        <h3 style={{ marginTop: 0 }}>Danh mục tin</h3>
+        <form onSubmit={handleCreateCategory} style={{ display: "grid", gap: 10 }}>
+          <input
+            className="adm-input"
+            value={newCategory.category_name}
+            onChange={(e) => setNewCategory((p) => ({ ...p, category_name: e.target.value }))}
+            placeholder="Tên danh mục..."
+          />
+          <input
+            className="adm-input"
+            value={newCategory.description}
+            onChange={(e) => setNewCategory((p) => ({ ...p, description: e.target.value }))}
+            placeholder="Mô tả..."
+          />
+          <button className="adm-btn" type="submit">
+            Thêm danh mục
+          </button>
+        </form>
+
+        <div style={{ marginTop: 12, overflowX: "auto" }}>
+          <table className="adm-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: 10 }}>ID</th>
+                <th style={{ textAlign: "left", padding: 10 }}>Tên</th>
+                <th style={{ textAlign: "left", padding: 10 }}>Mô tả</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.length === 0 ? (
+                <tr>
+                  <td colSpan={3} style={{ padding: 10, color: "#666" }}>
+                    Chưa có danh mục.
+                  </td>
+                </tr>
+              ) : (
+                categories.map((c) => (
+                  <tr key={c.category_id}>
+                    <td style={{ padding: 10 }}>{c.category_id}</td>
+                    <td style={{ padding: 10 }}>{c.category_name}</td>
+                    <td style={{ padding: 10 }}>{c.description || "—"}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* ========== POSTS LIST ========== */}
+      <section className="adm-card adm-card-pad" style={{ gridColumn: "1 / -1" }}>
+        <h3 style={{ marginTop: 0 }}>Danh sách bài viết</h3>
+
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+          <input
+            className="adm-input"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Tìm theo tiêu đề..."
+          />
+          <select className="adm-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="DRAFT">DRAFT</option>
+            <option value="PUBLISHED">PUBLISHED</option>
+            <option value="HIDDEN">HIDDEN</option>
+          </select>
+          <select className="adm-input" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <option value="ALL">Tất cả danh mục</option>
+            {categories.map((c) => (
+              <option key={c.category_id} value={c.category_id}>
+                {c.category_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ marginTop: 12, overflowX: "auto" }}>
+          <table className="adm-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: 10 }}>ID</th>
+                <th style={{ textAlign: "left", padding: 10 }}>Tiêu đề</th>
+                <th style={{ textAlign: "left", padding: 10 }}>Danh mục</th>
+                <th style={{ textAlign: "left", padding: 10 }}>Trạng thái</th>
+                <th style={{ textAlign: "left", padding: 10 }}>Cập nhật</th>
+                <th style={{ textAlign: "left", padding: 10 }}>Thao tác</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filteredPosts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: 10, color: "#666" }}>
+                    Chưa có bài viết phù hợp bộ lọc.
+                  </td>
+                </tr>
+              ) : (
+                filteredPosts.map((p) => {
+                  const cat = categoryMap.get(String(p.category_id))?.category_name || "—"
+                  const updated = p.updated_at || p.published_at
+                  return (
+                    <tr key={p.post_id}>
+                      <td style={{ padding: 10 }}>{p.post_id}</td>
+                      <td style={{ padding: 10, minWidth: 280 }}>
+                        <div style={{ fontWeight: 600 }}>{p.title}</div>
+                        {p.thumbnail_url ? (
+                          <div style={{ marginTop: 6, fontSize: 12, color: "#666", wordBreak: "break-all" }}>
+                            {p.thumbnail_url}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td style={{ padding: 10 }}>{cat}</td>
+                      <td style={{ padding: 10 }}>{statusLabel(p.status)}</td>
+                      <td style={{ padding: 10 }}>{updated ? new Date(updated).toLocaleString("vi-VN") : "—"}</td>
+                      <td style={{ padding: 10, whiteSpace: "nowrap" }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button className="adm-btn" onClick={() => previewPost(p)}>
+                            Preview
+                          </button>
+                          <button className="adm-btn" onClick={() => handleEditPost(p)}>
+                            Sửa
+                          </button>
+
+                          {p.status !== "PUBLISHED" ? (
+                            <button className="adm-btn adm-btn-primary" onClick={() => setPostStatus(p.post_id, "PUBLISHED")}>
+                              Đăng
+                            </button>
+                          ) : (
+                            <button className="adm-btn" onClick={() => setPostStatus(p.post_id, "HIDDEN")}>
+                              Ẩn
+                            </button>
+                          )}
+
+                          <button className="adm-btn adm-btn-danger" onClick={() => handleDeletePost(p.post_id)}>
+                            Xóa
+                          </button>
                         </div>
-                      )}
-                      
-                      {/* Status Badge */}
-                      <div className={`adm-post-status adm-status-${post.status.toLowerCase()}`}>
-                        {post.status === 'PUBLISHED' && <FiCheckCircle />}
-                        {post.status === 'DRAFT' && <FiClock />}
-                        {post.status === 'HIDDEN' && <FiEyeOff />}
-                        {statusLabel(post.status)}
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="adm-post-content">
-                      <div className="adm-post-meta">
-                        <span className="adm-post-category">
-                          <FiTag /> {cat}
-                        </span>
-                        <span className="adm-post-date">
-                          <FiCalendar /> {updated ? new Date(updated).toLocaleDateString("vi-VN") : "—"}
-                        </span>
-                      </div>
-
-                      <h3 className="adm-post-title">{post.title}</h3>
-                      
-                      <div 
-                        className="adm-post-excerpt"
-                        dangerouslySetInnerHTML={{ 
-                          __html: post.content_html?.substring(0, 100) + '...' || '' 
-                        }}
-                      />
-
-                      {/* Actions */}
-                      <div className="adm-post-actions">
-                        <button 
-                          className="adm-btn-action adm-btn-primary"
-                          onClick={() => previewPost(post)}
-                          title="Xem trước"
-                        >
-                          <FiEye /> Xem
-                        </button>
-                        
-                        <button 
-                          className="adm-btn-action"
-                          onClick={() => handleEditPost(post)}
-                          title="Chỉnh sửa"
-                        >
-                          <FiEdit2 /> Sửa
-                        </button>
-
-                        {post.status !== 'PUBLISHED' ? (
-                          <button 
-                            className="adm-btn-action adm-btn-success"
-                            onClick={() => setPostStatus(post.post_id, 'PUBLISHED')}
-                            title="Đăng bài"
-                          >
-                            <FiCheckCircle /> Đăng
-                          </button>
-                        ) : (
-                          <button 
-                            className="adm-btn-action adm-btn-warning"
-                            onClick={() => setPostStatus(post.post_id, 'HIDDEN')}
-                            title="Ẩn bài"
-                          >
-                            <FiEyeOff /> Ẩn
-                          </button>
-                        )}
-
-                        <button 
-                          className="adm-btn-action adm-btn-danger"
-                          onClick={() => handleDeletePost(post.post_id)}
-                          title="Xóa bài"
-                        >
-                          <FiTrash2 />
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                )
-              })
-            )}
-          </div>
-        </main>
-      </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }
-
-export default AdminNews

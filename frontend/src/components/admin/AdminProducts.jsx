@@ -14,8 +14,24 @@ export default function AdminProducts({
   setEditingProductId,
   handleProductSubmit,
   handleEditProduct,
-  handleDeleteProduct
+  handleDeleteProduct,
+  brands,
+  categories,
+  loadingBrands,
+  loadingCategories
 }) {
+  const handleImageUpload = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Store the actual File object for API upload
+    setProductForm((prev) => ({ 
+      ...prev, 
+      imageFile: file, // Store File object for API
+      image: URL.createObjectURL(file) // Create preview URL
+    }))
+  }
+
   return (
     <div className="adm-split">
       <section className="adm-card adm-card-pad">
@@ -37,23 +53,49 @@ export default function AdminProducts({
 
           <div className="adm-form-row">
             <label>Thương hiệu *</label>
-            <input
-              placeholder="ASUS, Dell, HP..."
-              value={productForm.brand}
-              onChange={(e) => setProductForm((prev) => ({ ...prev, brand: e.target.value }))}
+            <select
+              value={productForm.brand_id}
+              onChange={(e) => {
+                const selectedBrand = brands.find(b => b.brand_id === parseInt(e.target.value))
+                setProductForm((prev) => ({ 
+                  ...prev, 
+                  brand_id: e.target.value,
+                  brand: selectedBrand?.brand_name || ''
+                }))
+              }}
               required
-            />
+              disabled={loadingBrands}
+            >
+              <option value="">-- Chọn thương hiệu --</option>
+              {brands.map(brand => (
+                <option key={brand.brand_id} value={brand.brand_id}>
+                  {brand.brand_name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="adm-form-row">
-            <label>Dòng sản phẩm *</label>
-            <select value={productForm.series} onChange={(e) => setProductForm((prev) => ({ ...prev, series: e.target.value }))} required>
-              <option value="">-- Chọn dòng --</option>
-              <option value="Gaming">Gaming</option>
-              <option value="Văn phòng">Văn phòng</option>
-              <option value="Đồ họa">Đồ họa</option>
-              <option value="Cao cấp">Cao cấp</option>
-              <option value="Sinh viên">Sinh viên</option>
+            <label>Danh mục *</label>
+            <select
+              value={productForm.category_id}
+              onChange={(e) => {
+                const selectedCategory = categories.find(c => c.category_id === parseInt(e.target.value))
+                setProductForm((prev) => ({ 
+                  ...prev, 
+                  category_id: e.target.value,
+                  series: selectedCategory?.category_name || ''
+                }))
+              }}
+              required
+              disabled={loadingCategories}
+            >
+              <option value="">-- Chọn danh mục --</option>
+              {categories.map(category => (
+                <option key={category.category_id} value={category.category_id}>
+                  {category.category_name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -84,6 +126,18 @@ export default function AdminProducts({
           </div>
 
           <div className="adm-form-row">
+            <label>Loại RAM *</label>
+            <select value={productForm.ramType} onChange={(e) => setProductForm((prev) => ({ ...prev, ramType: e.target.value }))} required>
+              <option value="">-- Chọn loại RAM --</option>
+              <option value="DDR4">DDR4</option>
+              <option value="DDR5">DDR5</option>
+              <option value="LPDDR4X">LPDDR4X</option>
+              <option value="LPDDR5">LPDDR5</option>
+              <option value="LPDDR5X">LPDDR5X</option>
+            </select>
+          </div>
+
+          <div className="adm-form-row">
             <label>Ổ cứng *</label>
             <select value={productForm.storage} onChange={(e) => setProductForm((prev) => ({ ...prev, storage: e.target.value }))} required>
               <option value="">-- Chọn ổ cứng --</option>
@@ -95,7 +149,7 @@ export default function AdminProducts({
           </div>
 
           <div className="adm-form-row">
-            <label>Màn hình *</label>
+            <label>Kích thước màn hình *</label>
             <select value={productForm.screenSize} onChange={(e) => setProductForm((prev) => ({ ...prev, screenSize: e.target.value }))} required>
               <option value="">-- Kích thước --</option>
               <option value="14 inch">14 inch</option>
@@ -106,18 +160,33 @@ export default function AdminProducts({
           </div>
 
           <div className="adm-form-row">
-            <label>Độ phân giải *</label>
-            <select value={productForm.resolution} onChange={(e) => setProductForm((prev) => ({ ...prev, resolution: e.target.value }))} required>
-              <option value="">-- Chọn độ phân giải --</option>
-              <option value="Full HD (1920x1080)">Full HD (1920x1080)</option>
-              <option value="2K (2560x1440)">2K (2560x1440)</option>
-              <option value="4K (3840x2160)">4K (3840x2160)</option>
-            </select>
+            <label>Trọng lượng (kg) *</label>
+            <input
+              type="number"
+              step="0.1"
+              min="0.5"
+              placeholder="VD: 1.8"
+              value={productForm.weightKg}
+              onChange={(e) => setProductForm((prev) => ({ ...prev, weightKg: e.target.value }))}
+              required
+            />
           </div>
 
           <div className="adm-form-row">
             <label>Card đồ họa *</label>
             <input placeholder="NVIDIA RTX 3050 4GB" value={productForm.graphics} onChange={(e) => setProductForm((prev) => ({ ...prev, graphics: e.target.value }))} required />
+          </div>
+
+          <div className="adm-form-row">
+            <label>Hệ điều hành *</label>
+            <select value={productForm.os} onChange={(e) => setProductForm((prev) => ({ ...prev, os: e.target.value }))} required>
+              <option value="">-- Chọn hệ điều hành --</option>
+              <option value="Windows 11 Home">Windows 11 Home</option>
+              <option value="Windows 11 Pro">Windows 11 Pro</option>
+              <option value="Windows 10">Windows 10</option>
+              <option value="Ubuntu">Ubuntu</option>
+              <option value="No OS">No OS</option>
+            </select>
           </div>
 
           <div className="adm-form-row-3col">
@@ -136,18 +205,13 @@ export default function AdminProducts({
           </div>
 
           <div className="adm-form-row adm-span2">
-            <label>Cấu hình ngắn gọn *</label>
-            <textarea placeholder="VD: 16GB RAM | 512GB SSD | 15.6 inch Full HD | RTX 3050" value={productForm.config} onChange={(e) => setProductForm((prev) => ({ ...prev, config: e.target.value }))} required />
-          </div>
-
-          <div className="adm-form-row adm-span2">
-            <label>Thông số kỹ thuật *</label>
-            <textarea placeholder="VD: Intel Core i5-12500H | RTX 3050 | 144Hz..." value={productForm.specs} onChange={(e) => setProductForm((prev) => ({ ...prev, specs: e.target.value }))} required />
-          </div>
-
-          <div className="adm-form-row adm-span2">
-            <label>Link hình ảnh</label>
-            <input placeholder="https://example.com/image.jpg" value={productForm.image} onChange={(e) => setProductForm((prev) => ({ ...prev, image: e.target.value }))} />
+            <label>Upload hình ảnh *</label>
+            <input type="file" accept="image/*" onChange={handleImageUpload} required={!editingProductId} />
+            {productForm.image ? (
+              <div className="adm-image-preview">
+                <img src={productForm.image} alt="Xem trước ảnh sản phẩm" />
+              </div>
+            ) : null}
           </div>
 
           <div className="adm-form-actions adm-span2">
