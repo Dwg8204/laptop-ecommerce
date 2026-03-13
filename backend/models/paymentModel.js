@@ -1,9 +1,9 @@
 const db = require('../config/db');
 
 // ✅ Whitelist tại Model — tầng bảo vệ cuối cùng
-const ALLOWED_PAYMENT_STATUSES = ['UNPAID', 'PAID', 'REFUNDED'];
-const ALLOWED_PAYMENT_METHODS  = ['COD', 'VNPAY'];
-
+const ALLOWED_PAYMENT_STATUSES = ['UNPAID', 'PAID', 'REFUNDED', 'DEPOSITED'];
+const ALLOWED_PAYMENT_METHODS  = ['COD', 'VNPAY', 'MOMO']; 
+const PAYABLE_ORDER_STATUSES = ['PENDING_CONFIRMATION', 'WAITING_FOR_STOCK', 'PROCESSING']; // Chỉ những đơn hàng ở trạng thái này mới được thanh toán
 const Payment = {
 
     // ================================================================
@@ -69,4 +69,4 @@ const Payment = {
     }
 };
 
-module.exports = { Payment, ALLOWED_PAYMENT_STATUSES, ALLOWED_PAYMENT_METHODS };
+module.exports = { Payment, ALLOWED_PAYMENT_STATUSES, ALLOWED_PAYMENT_METHODS, PAYABLE_ORDER_STATUSES };
