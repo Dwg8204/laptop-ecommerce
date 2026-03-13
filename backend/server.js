@@ -31,6 +31,7 @@ const authAdminRoutes = require('./routes/authAdminRoutes');
 const blogRoutes = require('./routes/blogRoutes');
 const blogCategoryRoutes = require('./routes/blogCategoryRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 
 app.use('/api/sliders', sliderRoutes);
@@ -38,6 +39,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/auth/admin', authAdminRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/blog-categories', blogCategoryRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/brands', brandRoutes);
