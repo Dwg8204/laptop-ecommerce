@@ -665,6 +665,12 @@ const Product = {
         return result.affectedRows;
     },
 
+    variantExists: async (variantId) => {
+        const query = 'SELECT variant_id FROM product_variants WHERE variant_id = ?';
+        const [rows] = await db.query(query, [variantId]);
+        return rows.length > 0;
+    },
+
     /**
      * Hàm xóa sản phẩm vật lý khỏi database.
      * Việc xóa sản phẩm sẽ CASCADE xóa các specs, variants và images liên quan.
