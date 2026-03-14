@@ -10,9 +10,11 @@ const {
     verifyVnpaySignature,
     getVnpayMessage,
     getClientIp
-} = require('../helpers/vnpayHelper');  // ✅ Import helper mới
+} = require('../helpers/vnpayHelper'); 
+const notificationService = require('../services/notificationService');
 
 const { createMoMoPaymentRequest, verifyMoMoSignature } = require('../helpers/momoHelper');
+const Notification = require('../models/notificationModel');
 const paymentController = {
 
     // ================================================================
@@ -209,12 +211,16 @@ const paymentController = {
             const message      = getVnpayMessage(responseCode); // ✅ Map code → tiếng Việt
 
             if (responseCode === '00') {
+                const changed = await Payment.markAsPaidIfNeeded(orderId, params.vnp_TransactionNo);
+                if (changed >0) {
+                    await notificationService.notifyOrderPaid(orderId, 'VNPAY', params.vnp_TransactionNo);
+                }
                 // ✅ Thanh toán thành công
-                await Payment.updatePaymentStatus(
-                    orderId,
-                    'PAID',
-                    params.vnp_TransactionNo // ✅ Mã giao dịch VNPay
-                );
+                // await Payment.updatePaymentStatus(
+                //     orderId,
+                //     'PAID',
+                //     params.vnp_TransactionNo // ✅ Mã giao dịch VNPay
+                // );
 
                 // ✅ Redirect về trang thành công của Frontend
                 return res.redirect(
@@ -282,11 +288,15 @@ const paymentController = {
             // ✅ Bước 5: Cập nhật trạng thái
             const responseCode = params.vnp_ResponseCode;
             if (responseCode === '00') {
-                await Payment.updatePaymentStatus(
-                    orderId,
-                    'PAID',
-                    params.vnp_TransactionNo
-                );
+                const changed = await Payment.markAsPaidIfNeeded(orderId, params.vnp_TransactionNo);
+                if (changed > 0) {
+                    await notificationService.notifyOrderPaid(orderId, 'VNPAY', params.vnp_TransactionNo);
+                }
+                // await Payment.updatePaymentStatus(
+                //     orderId,
+                //     'PAID',
+                //     params.vnp_TransactionNo
+                // );
             }
 
             // ✅ VNPay bắt buộc trả về RspCode: '00' để xác nhận đã nhận IPN
@@ -314,8 +324,12 @@ const paymentController = {
             const resultCode = parseInt(params.resultCode); // 0 là thành công
 
             if (resultCode === 0) {
+                const changed = await Payment.markAsPaidIfNeeded(orderId, params.transId.toString());
+                if (changed > 0) {
+                    await notificationService.notifyOrderPaid(orderId, 'MOMO', params.transId.toString());
+                }
                 // Thành công: Cập nhật DB và trả về Frontend
-                await Payment.updatePaymentStatus(orderId, 'PAID', params.transId.toString());
+                // await Payment.updatePaymentStatus(orderId, 'PAID', params.transId.toString());
                 return res.redirect(`${process.env.FRONTEND_ORIGIN}/payment/success?orderId=${orderId}`);
             }
 
@@ -345,7 +359,11 @@ const paymentController = {
 
             // 2. Cập nhật Database nếu thành công
             if (resultCode === 0) {
-                await Payment.updatePaymentStatus(orderId, 'PAID', params.transId.toString());
+                const changed = await Payment.markAsPaidIfNeeded(orderId, params.transId.toString());
+                if (changed > 0) {
+                    await notificationService.notifyOrderPaid(orderId, 'MOMO', params.transId.toString());
+                }
+                // await Payment.updatePaymentStatus(orderId, 'PAID', params.transId.toString());
             }
 
             // 3. Phản hồi HTTP 204 No Content cho MoMo biết là mình đã nhận IPN
