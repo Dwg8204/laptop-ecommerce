@@ -44,6 +44,18 @@ const Payment = {
         return rows[0] || null;
     },
 
+    markAsPaidIfNeeded: async (order_id, transaction_id = null) => {
+        const [result] = await db.query(
+            `UPDATE payments
+             SET payment_status = 'PAID',
+                 transaction_id = COALESCE(?, transaction_id)
+             WHERE order_id = ?
+               AND payment_status <> 'PAID'`,
+            [transaction_id, order_id]
+        );
+        return result.affectedRows; // 1 = vừa chuyển sang PAID, 0 = đã PAID từ trước
+    },
+
     // ================================================================
     // [UPDATE] Cập nhật trạng thái thanh toán
     // ✅ Whitelist tại Model — không để Controller tự do truyền vào
