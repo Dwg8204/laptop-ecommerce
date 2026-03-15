@@ -1,0 +1,89 @@
+/* Top Bar */
+.top-bar {
+  background: #d70018;
+  color: #fff;
+  font-size: 13px;
+  padding: 6px 20px;
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+}
+
+/* Main Header */
+.header {
+  position: fixed;
+  background: #e30019;
+  color: #fff;
+  padding: 12px 40px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.category-btn {
+  background: #ff4d4f;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.search-container {
+  flex: 1;
+  display: flex;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 15px;
+  border-radius: 20px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.cart {
+  cursor: pointer;
+}
+
+.login-btn {
+  background: #ff4d4f;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* User Menu Dropdown */
+.user-dropdown-item {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.user-dropdown-item:hover {
+  background: #f5f5f5;
+}
