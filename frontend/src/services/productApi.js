@@ -293,17 +293,32 @@ export const addVariantToProduct = async (productId, variantData, variantImages 
   try {
     const formData = new FormData()
 
-    // Send variant as JSON string to match backend parser branch reliably.
-    formData.append('variant', JSON.stringify(variantData))
+    // Reuse update product API to create a new variant, avoiding custom backend endpoint.
+    formData.append('variants_to_create', JSON.stringify([
+      {
+        sku: variantData.sku,
+        cpu_name: variantData.cpu_name,
+        cpu_benchmark_score: variantData.cpu_benchmark_score ?? null,
+        gpu: variantData.gpu,
+        ram_gb: variantData.ram_gb,
+        ram_type: variantData.ram_type,
+        storage_gb: variantData.storage_gb,
+        color_name: variantData.color_name,
+        original_price: variantData.original_price,
+        discount_price: variantData.discount_price,
+        stock_quantity: variantData.stock_quantity,
+        status: variantData.status,
+      },
+    ]))
 
     if (variantImages instanceof FileList) {
       Array.from(variantImages).forEach((file) => {
-        formData.append('variantImages', file)
+        formData.append('newVariant_0_images_create', file)
       })
     } else if (Array.isArray(variantImages)) {
       variantImages.forEach((file) => {
         if (file instanceof File) {
-          formData.append('variantImages', file)
+          formData.append('newVariant_0_images_create', file)
         }
       })
     }
@@ -314,8 +329,8 @@ export const addVariantToProduct = async (productId, variantData, variantImages 
       headers.Authorization = `Bearer ${token}`
     }
 
-    const response = await fetch(`${API_BASE}/${productId}/variants`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE}/${productId}`, {
+      method: 'PUT',
       headers,
       body: formData
     })
