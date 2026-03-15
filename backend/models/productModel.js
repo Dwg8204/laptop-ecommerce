@@ -664,61 +664,6 @@ const Product = {
         const [result] = await db.query(query, [newStatus, productId]);
         return result.affectedRows;
     },
-     
-    /**
-     * Thêm một phiên bản mới cho sản phẩm đã tồn tại.
-     * @param {number} productId - ID sản phẩm.
-     * @param {Object} variant - Dữ liệu phiên bản.
-     * @param {Array<string>} imageUrls - Danh sách URL ảnh của phiên bản.
-     * @returns {Promise<number>} variant_id vừa tạo.
-     */
-    addVariantToProduct: async (productId, variant, imageUrls = []) => {
-        const connection = await db.getConnection();
-        try {
-            await connection.beginTransaction();
-
-            const variantInsertQuery = `
-                INSERT INTO product_variants
-                (product_id, sku, cpu_name, cpu_benchmark_score, gpu, ram_gb, ram_type, storage_gb, color_name, original_price, discount_price, stock_quantity, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-
-            const [variantResult] = await connection.query(variantInsertQuery, [
-                productId,
-                variant.sku,
-                variant.cpu_name || null,
-                variant.cpu_benchmark_score || null,
-                variant.gpu || null,
-                variant.ram_gb,
-                variant.ram_type || null,
-                variant.storage_gb,
-                variant.color_name,
-                variant.original_price,
-                variant.discount_price || null,
-                variant.stock_quantity || 0,
-                variant.status || 'IN_STOCK'
-            ]);
-
-            const newVariantId = variantResult.insertId;
-
-            if (Array.isArray(imageUrls) && imageUrls.length > 0) {
-                const variantImageInsertQuery = 'INSERT INTO product_images (product_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)';
-
-                await connection.query(variantImageInsertQuery, [productId, newVariantId, imageUrls[0], true]);
-                for (let i = 1; i < imageUrls.length; i++) {
-                    await connection.query(variantImageInsertQuery, [productId, newVariantId, imageUrls[i], false]);
-                }
-            }
-
-            await connection.commit();
-            return newVariantId;
-        } catch (error) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
-        }
-    },
 
     variantExists: async (variantId) => {
         const query = 'SELECT variant_id FROM product_variants WHERE variant_id = ?';
@@ -735,30 +680,6 @@ const Product = {
     hardDelete: async (id) => {
         const query = 'DELETE FROM products WHERE product_id = ?';
         const [result] = await db.query(query, [id]);
-        return result.affectedRows;
-    },
-
-    getAllReviews: async () => {
-        const [rows] = await db.query(
-            `SELECT
-                pr.review_id,
-                pr.product_id,
-                p.product_name,
-                pr.user_id,
-                u.full_name AS reviewer_name,
-                pr.rating,
-                pr.content,
-                pr.created_at
-            FROM product_reviews pr
-            JOIN products p ON pr.product_id = p.product_id
-            JOIN users u ON pr.user_id = u.user_id
-            ORDER BY pr.created_at DESC`
-        );
-        return rows;
-    },
-
-    deleteReviewById: async (reviewId) => {
-        const [result] = await db.query('DELETE FROM product_reviews WHERE review_id = ?', [reviewId]);
         return result.affectedRows;
     }
 };

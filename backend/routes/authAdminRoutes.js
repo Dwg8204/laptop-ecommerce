@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authAdminController = require('../controllers/authAdminController');
+const adminManagementController = require('../controllers/adminManagementController');
 
 /**
  * @route GET /api/auth/admin/users
@@ -17,10 +18,10 @@ router.get('/users', authAdminController.getSystemUsers);
  */
 router.post('/users', authAdminController.createStaff);
 
-router.get('/customers', authAdminController.getCustomers);
-router.patch('/customers/:id/status', authAdminController.updateCustomerStatus);
+router.get('/customers', adminManagementController.getCustomers);
+router.patch('/customers/:id/status', adminManagementController.updateCustomerStatus);
 
-router.get('/reviews', authAdminController.getProductReviews);
-router.delete('/reviews/:id', authAdminController.deleteProductReview);
+router.get('/reviews', adminManagementController.getProductReviews);
+router.delete('/reviews/:id', adminManagementController.deleteProductReview);
 
 module.exports = router;

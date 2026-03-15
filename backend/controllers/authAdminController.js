@@ -1,6 +1,5 @@
 const User = require('../models/userModel');
 const AuthAdmin = require('../models/authAdmin');
-const Product = require('../models/productModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -141,109 +140,6 @@ const authAdminController = {
 			res.status(500).json({
 				success: false,
 				message: 'Lỗi khi tạo tài khoản nhân viên'
-			});
-		}
-	},
-
-	getCustomers: async (req, res) => {
-		try {
-			const authUser = await ensureAdminAccess(req, res);
-			if (!authUser) return;
-
-			const customers = await User.getAllCustomersWithStats();
-			res.status(200).json({
-				success: true,
-				message: 'Lấy danh sách khách hàng thành công',
-				data: customers
-			});
-		} catch (error) {
-			console.error('Error getCustomers:', error);
-			res.status(500).json({
-				success: false,
-				message: 'Lỗi khi lấy danh sách khách hàng'
-			});
-		}
-	},
-
-	updateCustomerStatus: async (req, res) => {
-		try {
-			const authUser = await ensureAdminAccess(req, res);
-			if (!authUser) return;
-
-			const userId = Number(req.params.id);
-			const status = String(req.body.status || '').toUpperCase();
-
-			if (!userId || userId <= 0) {
-				return res.status(400).json({ success: false, message: 'ID khách hàng không hợp lệ' });
-			}
-			if (!['ACTIVE', 'LOCKED'].includes(status)) {
-				return res.status(400).json({ success: false, message: 'Trạng thái chỉ chấp nhận ACTIVE hoặc LOCKED' });
-			}
-
-			const affectedRows = await User.updateUserStatus(userId, status);
-			if (!affectedRows) {
-				return res.status(404).json({ success: false, message: 'Không tìm thấy khách hàng để cập nhật' });
-			}
-
-			res.status(200).json({
-				success: true,
-				message: 'Cập nhật trạng thái khách hàng thành công',
-				data: { user_id: userId, status }
-			});
-		} catch (error) {
-			console.error('Error updateCustomerStatus:', error);
-			res.status(500).json({
-				success: false,
-				message: 'Lỗi khi cập nhật trạng thái khách hàng'
-			});
-		}
-	},
-
-	getProductReviews: async (req, res) => {
-		try {
-			const authUser = await ensureAdminAccess(req, res);
-			if (!authUser) return;
-
-			const reviews = await Product.getAllReviews();
-			res.status(200).json({
-				success: true,
-				message: 'Lấy danh sách đánh giá thành công',
-				data: reviews
-			});
-		} catch (error) {
-			console.error('Error getProductReviews:', error);
-			res.status(500).json({
-				success: false,
-				message: 'Lỗi khi lấy danh sách đánh giá'
-			});
-		}
-	},
-
-	deleteProductReview: async (req, res) => {
-		try {
-			const authUser = await ensureAdminAccess(req, res);
-			if (!authUser) return;
-
-			const reviewId = Number(req.params.id);
-			if (!reviewId || reviewId <= 0) {
-				return res.status(400).json({ success: false, message: 'ID đánh giá không hợp lệ' });
-			}
-
-			const affectedRows = await Product.deleteReviewById(reviewId);
-			if (!affectedRows) {
-				return res.status(404).json({ success: false, message: 'Không tìm thấy đánh giá để xóa' });
-			}
-
-			res.status(200).json({
-				success: true,
-				message: 'Đã xóa đánh giá thành công',
-				data: { review_id: reviewId }
-			});
-		} catch (error) {
-			console.error('Error deleteProductReview:', error);
-			res.status(500).json({
-				success: false,
-				message: 'Lỗi khi xóa đánh giá'
 			});
 		}
 	}
