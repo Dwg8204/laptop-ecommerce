@@ -1,25 +1,27 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiPackage, FiTruck, FiCheckCircle, FiArrowLeft, FiCalendar, FiMapPin } from 'react-icons/fi'
+import { useAuth } from '../context/AuthContext'
+import { readOrdersForUser } from '../lib/orderStorage'
 import '../styles/OrderTracking.css'
 
 export default function OrderTracking() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
 
   useEffect(() => {
-    // Lấy orders từ localStorage
-    const storedOrders = localStorage.getItem('laptopOrders')
-    if (storedOrders) {
-      try {
-        setOrders(JSON.parse(storedOrders))
-      } catch (error) {
-        console.error('Error parsing orders:', error)
-        setOrders([])
-      }
+    if (!user?.user_id) {
+      setOrders([])
+      setSelectedOrder(null)
+      return
     }
-  }, [])
+
+    const userOrders = readOrdersForUser(user.user_id, user.name)
+    setOrders(userOrders)
+    setSelectedOrder(userOrders[0] || null)
+  }, [user])
 
   const getTrackingSteps = (order) => {
     const steps = [
