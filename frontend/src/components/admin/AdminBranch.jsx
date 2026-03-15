@@ -13,6 +13,7 @@ export default function AdminBrand() {
   const [submitting, setSubmitting] = useState(false)
 
   const API_BASE = buildApiUrl("/api/brands")
+  const BRAND_MEDIA_API = buildApiUrl("/api/brand-media/upload-logo")
   const isEditing = editId !== null
 
   const brandStats = useMemo(() => {
@@ -58,11 +59,6 @@ export default function AdminBrand() {
 
     try {
       setSubmitting(true)
-      const formData = new FormData()
-      formData.append("brand_name", brandName.trim())
-      if (logoFile) {
-        formData.append("logo", logoFile)
-      }
 
       const token = getAuthToken()
       const headers = {}
@@ -70,10 +66,39 @@ export default function AdminBrand() {
         headers.Authorization = `Bearer ${token}`
       }
 
+      let uploadedLogoUrl = logoPreview || ""
+      if (logoFile) {
+        const uploadForm = new FormData()
+        uploadForm.append("logo", logoFile)
+
+        const uploadResponse = await fetch(BRAND_MEDIA_API, {
+          method: "POST",
+          headers,
+          body: uploadForm,
+        })
+
+        const uploadData = await uploadResponse.json()
+        if (!uploadResponse.ok || !uploadData.success) {
+          throw new Error(uploadData.message || "Upload logo thất bại")
+        }
+
+        uploadedLogoUrl = uploadData?.data?.logo_url || ""
+      }
+
+      const payload = {
+        brand_name: brandName.trim(),
+      }
+      if (uploadedLogoUrl) {
+        payload.logo_url = uploadedLogoUrl
+      }
+
       const response = await fetch(editId ? `${API_BASE}/${editId}` : API_BASE, {
         method: editId ? "PUT" : "POST",
-        headers,
-        body: formData,
+        headers: {
+          ...headers,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()

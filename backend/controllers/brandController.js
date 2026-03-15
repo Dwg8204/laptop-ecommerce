@@ -3,17 +3,6 @@ const db = require('../config/db');
 const { parseQueryParams, getOffset, buildPaginationResult } = require('../helpers/queryHelper');
 const { isValidId } = require('../helpers/productValidationHelper');
 
-const toStoredImageUrl = (file) => {
-    if (!file) return null;
-    if (file.path && /^https?:\/\//i.test(file.path)) {
-        return file.path;
-    }
-    if (file.filename) {
-        return `/uploads/brands/${file.filename}`;
-    }
-    return file.path || null;
-};
-
 const brandController = {
     /**
      * API: Lấy tất cả thương hiệu (GET /api/brands)
@@ -65,21 +54,19 @@ const brandController = {
     createBrand: async (req, res) => {
         try {
             const { brand_name, logo_url } = req.body;
-            const uploadedLogoUrl = toStoredImageUrl(req.file);
-            const finalLogoUrl = uploadedLogoUrl || logo_url;
 
             // Validate dữ liệu đầu vào
-            const errors = Brand.validateBrandData({ brand_name, logo_url: finalLogoUrl });
+            const errors = Brand.validateBrandData({ brand_name, logo_url });
             if (errors.length > 0) {
                 return res.status(400).json({ success: false, message: 'Lỗi dữ liệu thương hiệu', errors });
             }
 
-            const newBrandId = await Brand.create({ brand_name, logo_url: finalLogoUrl });
+            const newBrandId = await Brand.create({ brand_name, logo_url });
 
             res.status(201).json({
                 success: true,
                 message: 'Thêm thương hiệu thành công!',
-                data: { brand_id: newBrandId, brand_name, logo_url: finalLogoUrl || null }
+                data: { brand_id: newBrandId, brand_name, logo_url }
             });
         } catch (error) {
             console.error('Lỗi khi thêm thương hiệu:', error);
@@ -98,8 +85,6 @@ const brandController = {
         try {
             const { id } = req.params;
             const { brand_name, logo_url } = req.body;
-            const uploadedLogoUrl = toStoredImageUrl(req.file);
-            const finalLogoUrl = uploadedLogoUrl || logo_url;
 
             if (!isValidId(id)) {
                 return res.status(400).json({ success: false, message: 'ID thương hiệu không hợp lệ.' });
@@ -111,14 +96,14 @@ const brandController = {
             }
 
             // Validate dữ liệu đầu vào
-            const errors = Brand.validateBrandData({ brand_name, logo_url: finalLogoUrl }, true); // isUpdate = true
+            const errors = Brand.validateBrandData({ brand_name, logo_url }, true); // isUpdate = true
             if (errors.length > 0) {
                 return res.status(400).json({ success: false, message: 'Lỗi dữ liệu cập nhật thương hiệu', errors });
             }
 
             const updateData = {};
             if (brand_name !== undefined) updateData.brand_name = brand_name;
-            if (finalLogoUrl !== undefined) updateData.logo_url = finalLogoUrl;
+            if (logo_url !== undefined) updateData.logo_url = logo_url;
 
             if (Object.keys(updateData).length === 0) {
                 return res.status(400).json({ success: false, message: 'Không có thông tin nào được cung cấp để cập nhật.' });

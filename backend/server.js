@@ -24,6 +24,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 const sliderRoutes = require('./routes/sliderRoutes');
 const productRoutes = require('./routes/productRoutes');
 const brandRoutes = require('./routes/brandRoutes');
+const brandMediaRoutes = require('./routes/brandMediaRoutes');
 const productCategoryRoutes = require('./routes/productCategoryRoutes');
 const authRoutes = require('./routes/authRoutes');
 const authAdminRoutes = require('./routes/authAdminRoutes');
@@ -45,6 +46,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/brands', brandRoutes);
+app.use('/api/brand-media', brandMediaRoutes);
 app.use('/api/product-categories', productCategoryRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/cart', cartRoutes);
