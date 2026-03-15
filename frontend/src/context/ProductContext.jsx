@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import * as productApi from '../services/productApi'
+import { getImageUrl } from '../config/api'
 
 const ProductContext = createContext()
 
@@ -34,10 +35,13 @@ export function ProductProvider({ children }) {
           const storage = variant?.storage ?? (product.representative_storage_gb ? `${product.representative_storage_gb}GB` : '')
           const cpu = variant?.cpu ?? product.representative_cpu_name ?? ''
           const graphics = variant?.graphics_card ?? product.representative_gpu ?? ''
+          const version = variant?.color_name || ''
 
           return {
             id: String(product.product_id),
             name: product.product_name,
+            brand_id: product.brand_id ? String(product.brand_id) : '',
+            category_id: product.category_id ? String(product.category_id) : '',
             brand: product.brand_name || 'Unknown',
             series: product.category_name || '',
             price: Number(price) || 0,
@@ -45,6 +49,7 @@ export function ProductProvider({ children }) {
             storage,
             ram,
             ramType: variant?.ram_type || '',
+            version,
             cpu,
             screenSize: product.screen_size ? `${product.screen_size} inch` : '',
             weightKg: product.weight_kg || '',
@@ -52,7 +57,7 @@ export function ProductProvider({ children }) {
             graphics,
             stock: Number(stock) || 0,
             inStock: Number(stock) > 0,
-            image: product.primary_product_image_url || product.images?.[0]?.image_url || variant?.images?.[0]?.image_url || 'https://via.placeholder.com/300',
+            image: getImageUrl(product.primary_product_image_url || product.images?.[0]?.image_url || variant?.images?.[0]?.image_url),
             specs: cpu && graphics ? `${cpu} | ${graphics}` : 'Đang cập nhật',
             config: ram && storage && product.screen_size
               ? `${ram}${variant?.ram_type ? ` ${variant.ram_type}` : ''} | ${storage} | ${product.screen_size} inch`
@@ -96,51 +101,80 @@ export function ProductProvider({ children }) {
       if (!productData.category_id || productData.category_id === '') {
         throw new Error('Vui lòng chọn danh mục')
       }
-      if (!productData.productImages) {
+      if (!productData.productImages || productData.productImages.length === 0) {
         throw new Error('Vui lòng upload hình ảnh sản phẩm')
       }
-      if (!productData.ram) {
-        throw new Error('Vui lòng chọn RAM')
-      }
-      if (!productData.storage) {
-        throw new Error('Vui lòng chọn dung lượng ổ cứng')
-      }
-      if (!productData.price || parseFloat(productData.price) <= 0) {
-        throw new Error('Vui lòng nhập giá sản phẩm hợp lệ')
-      }
+      let variants = []
 
-      // Extract numbers from RAM and Storage (e.g., "16GB" -> 16, "512GB" -> 512)
-      const ramValue = parseInt(productData.ram)
-      const storageValue = parseInt(productData.storage)
-      
-      if (isNaN(ramValue) || ramValue <= 0) {
-        throw new Error('RAM không hợp lệ')
-      }
-      if (isNaN(storageValue) || storageValue <= 0) {
-        throw new Error('Dung lượng ổ cứng không hợp lệ')
-      }
-      if (!productData.ramType) {
-        throw new Error('Vui lòng chọn loại RAM')
-      }
+      if (Array.isArray(productData.productVariants) && productData.productVariants.length > 0) {
+        variants = productData.productVariants.map((v, index) => {
+          const ramValue = parseInt(v.ram)
+          const storageValue = parseInt(v.storage)
+          const originalPrice = parseFloat(v.originalPrice)
+          const discountPrice = v.discountPrice ? parseFloat(v.discountPrice) : null
+          const stockQuantity = parseInt(v.stock) || 0
+          const normalizedSku = String(v.sku || '').trim()
 
-      // Transform frontend data to backend format
-      const variant = {
-        sku: `${productData.brand || 'LAPTOP'}-${Date.now()}`,
-        color_name: 'Default',
-        ram_gb: ramValue, // Already validated
-        ram_type: productData.ramType || 'DDR4',
-        storage_gb: storageValue, // Already validated
-        cpu_name: productData.cpu || 'Intel Core i5',
-        gpu: productData.graphics || 'Integrated',
-        // original_price = giá gốc (cao hơn), discount_price = giá sau giảm (thấp hơn)
-        original_price: parseFloat(productData.oldPrice || productData.price), // Giá gốc
-        stock_quantity: parseInt(productData.stock) || 0,
-        status: parseInt(productData.stock) > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
-      };
-      
-      // Only include discount_price if there's an actual discount (NOT null/undefined)
-      if (productData.oldPrice && parseFloat(productData.oldPrice) > parseFloat(productData.price)) {
-        variant.discount_price = parseFloat(productData.price); // Giá sau giảm
+          if (!normalizedSku || !v.color || !v.cpu || !v.gpu || isNaN(ramValue) || isNaN(storageValue) || isNaN(originalPrice)) {
+            throw new Error(`Phiên bản #${index + 1} chưa hợp lệ. Vui lòng kiểm tra lại thông tin.`)
+          }
+          if (!Array.isArray(v.imageFiles) || v.imageFiles.length === 0) {
+            throw new Error(`Phiên bản #${index + 1} cần tối thiểu 1 ảnh.`)
+          }
+
+          return {
+            sku: normalizedSku,
+            ram_gb: ramValue,
+            ram_type: v.ramType || 'DDR4',
+            storage_gb: storageValue,
+            cpu_name: v.cpu,
+            gpu: v.gpu,
+            color_name: v.color.trim(),
+            original_price: originalPrice,
+            discount_price: discountPrice,
+            stock_quantity: stockQuantity,
+            status: stockQuantity > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
+          }
+        })
+      } else {
+        if (!productData.ram) {
+          throw new Error('Vui lòng chọn RAM')
+        }
+        if (!productData.storage) {
+          throw new Error('Vui lòng chọn dung lượng ổ cứng')
+        }
+        if (!productData.price || parseFloat(productData.price) <= 0) {
+          throw new Error('Vui lòng nhập giá sản phẩm hợp lệ')
+        }
+
+        const ramValue = parseInt(productData.ram)
+        const storageValue = parseInt(productData.storage)
+
+        if (isNaN(ramValue) || ramValue <= 0) {
+          throw new Error('RAM không hợp lệ')
+        }
+        if (isNaN(storageValue) || storageValue <= 0) {
+          throw new Error('Dung lượng ổ cứng không hợp lệ')
+        }
+
+        const variant = {
+          sku: `${productData.brand || 'LAPTOP'}-${Date.now()}`,
+          ram_gb: ramValue,
+          ram_type: productData.ramType || 'DDR4',
+          storage_gb: storageValue,
+          cpu_name: productData.cpu || 'Intel Core i5',
+          gpu: productData.graphics || 'Integrated',
+          color_name: productData.version?.trim() || 'Default',
+          original_price: parseFloat(productData.oldPrice || productData.price),
+          stock_quantity: parseInt(productData.stock) || 0,
+          status: parseInt(productData.stock) > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
+        }
+
+        if (productData.oldPrice && parseFloat(productData.oldPrice) > parseFloat(productData.price)) {
+          variant.discount_price = parseFloat(productData.price)
+        }
+
+        variants = [variant]
       }
       
       const apiData = {
@@ -152,14 +186,14 @@ export function ProductProvider({ children }) {
         screen_size: parseFloat(productData.screenSize) || undefined,
         weight_kg: parseFloat(productData.weightKg) || undefined,
         os: productData.os || 'Windows 11',
-        variants: [variant],
-        productImages: productData.productImages, // File object
-        variantImages: productData.productImages ? [productData.productImages] : [] // Wrap single File in array for variant_0_images
+        variants,
+        productImages: productData.productImages,
+        variantImages: productData.productVariants?.map((variant) => variant.imageFiles || []) || []
       }
 
       console.log('🔍 Sending product data to API:', {
         ...apiData,
-        productImages: apiData.productImages ? 'File present' : 'No file',
+        productImages: apiData.productImages?.length ? `${apiData.productImages.length} files` : 'No file',
         variantImages: apiData.variantImages.length > 0 ? `${apiData.variantImages.length} files` : 'No files'
       })
 
@@ -170,6 +204,8 @@ export function ProductProvider({ children }) {
         const newProduct = {
           id: response.data.product_id.toString(),
           name: response.data.product_name,
+          brand_id: String(productData.brand_id || ''),
+          category_id: String(productData.category_id || ''),
           brand: productData.brand,
           series: productData.series || '',
           price: parseFloat(productData.price),
@@ -177,6 +213,7 @@ export function ProductProvider({ children }) {
           storage: productData.storage,
           ram: productData.ram,
           ramType: productData.ramType,
+          version: productData.version || '',
           cpu: productData.cpu,
           screenSize: productData.screenSize,
           weightKg: productData.weightKg,
@@ -184,7 +221,7 @@ export function ProductProvider({ children }) {
           graphics: productData.graphics,
           stock: parseInt(productData.stock) || 0,
           inStock: parseInt(productData.stock) > 0,
-          image: productData.image || 'https://via.placeholder.com/300',
+          image: getImageUrl(productData.image),
           specs: productData.specs || `${productData.cpu} | ${productData.graphics}`,
           config: productData.config || `${productData.ram} | ${productData.storage} | ${productData.screenSize}`,
           discount: productData.discount,
@@ -285,6 +322,134 @@ export function ProductProvider({ children }) {
     }
   }
 
+  const addVariantToProduct = async (productId, variantInput, variantImages = []) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const ramValue = parseInt(variantInput.ram)
+      const storageValue = parseInt(variantInput.storage)
+      const originalPrice = parseFloat(variantInput.originalPrice)
+      const discountPrice = variantInput.discountPrice ? parseFloat(variantInput.discountPrice) : null
+      const stockQuantity = parseInt(variantInput.stock) || 0
+      const normalizedSku = String(variantInput.sku || '').trim()
+
+      if (!normalizedSku || !variantInput.color || !variantInput.cpu || !variantInput.gpu || isNaN(ramValue) || isNaN(storageValue) || isNaN(originalPrice)) {
+        throw new Error('Thông tin phiên bản chưa đầy đủ hoặc không hợp lệ')
+      }
+      if (ramValue <= 0 || storageValue <= 0 || originalPrice <= 0) {
+        throw new Error('RAM, ổ cứng và giá gốc phải lớn hơn 0')
+      }
+      if (discountPrice !== null && discountPrice >= originalPrice) {
+        throw new Error('Giá khuyến mãi phải nhỏ hơn giá gốc')
+      }
+      if (!Array.isArray(variantImages) || variantImages.length === 0) {
+        throw new Error('Phiên bản cần tối thiểu 1 ảnh')
+      }
+
+      const variantData = {
+        sku: normalizedSku,
+        cpu_name: variantInput.cpu,
+        gpu: variantInput.gpu,
+        ram_gb: ramValue,
+        ram_type: variantInput.ramType || 'DDR4',
+        storage_gb: storageValue,
+        color_name: variantInput.color,
+        original_price: originalPrice,
+        discount_price: discountPrice,
+        stock_quantity: stockQuantity,
+        status: stockQuantity > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
+      }
+
+      const response = await productApi.addVariantToProduct(productId, variantData, variantImages)
+
+      if (response?.success) {
+        // Refresh minimal product state in list with newest stock aggregate when needed.
+        setProducts((prev) => prev.map((p) => {
+          if (String(p.id) !== String(productId)) return p
+
+          const updatedPrice = discountPrice || originalPrice
+          return {
+            ...p,
+            price: p.price > 0 ? Math.min(p.price, updatedPrice) : updatedPrice,
+            oldPrice: p.oldPrice > 0 ? Math.max(p.oldPrice, originalPrice) : originalPrice,
+            stock: Number(p.stock || 0) + stockQuantity,
+            inStock: true,
+          }
+        }))
+      }
+
+      return response
+    } catch (err) {
+      console.error('Error adding variant to product:', err)
+      setError(err.message)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updateVariantInProduct = async (productId, variantInput, variantImages = []) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const variantId = parseInt(variantInput.variant_id)
+      const ramValue = parseInt(variantInput.ram)
+      const storageValue = parseInt(variantInput.storage)
+      const originalPrice = parseFloat(variantInput.originalPrice)
+      const discountPrice = variantInput.discountPrice ? parseFloat(variantInput.discountPrice) : null
+      const stockQuantity = parseInt(variantInput.stock) || 0
+      const normalizedSku = String(variantInput.sku || '').trim()
+
+      if (!variantId || !normalizedSku || !variantInput.color || !variantInput.cpu || !variantInput.gpu || isNaN(ramValue) || isNaN(storageValue) || isNaN(originalPrice)) {
+        throw new Error('Thông tin phiên bản chưa đầy đủ hoặc không hợp lệ')
+      }
+      if (ramValue <= 0 || storageValue <= 0 || originalPrice <= 0) {
+        throw new Error('RAM, ổ cứng và giá gốc phải lớn hơn 0')
+      }
+      if (discountPrice !== null && discountPrice >= originalPrice) {
+        throw new Error('Giá khuyến mãi phải nhỏ hơn giá gốc')
+      }
+
+      const variantData = {
+        sku: normalizedSku,
+        cpu_name: variantInput.cpu,
+        gpu: variantInput.gpu,
+        ram_gb: ramValue,
+        ram_type: variantInput.ramType || 'DDR4',
+        storage_gb: storageValue,
+        color_name: variantInput.color,
+        original_price: originalPrice,
+        discount_price: discountPrice,
+        stock_quantity: stockQuantity,
+        status: stockQuantity > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
+      }
+
+      return await productApi.updateProductVariant(productId, variantId, variantData, variantImages)
+    } catch (err) {
+      console.error('Error updating product variant:', err)
+      setError(err.message)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const removeVariantFromProduct = async (productId, variantId) => {
+    try {
+      setLoading(true)
+      setError(null)
+      return await productApi.deleteVariantFromProduct(productId, variantId)
+    } catch (err) {
+      console.error('Error deleting product variant:', err)
+      setError(err.message)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const getProductById = (id) => {
     return products.find(p => p.id === id)
   }
@@ -294,6 +459,9 @@ export function ProductProvider({ children }) {
     loading,
     error,
     addProduct,
+    addVariantToProduct,
+    updateVariantInProduct,
+    removeVariantFromProduct,
     updateProduct,
     deleteProduct,
     getProductById,

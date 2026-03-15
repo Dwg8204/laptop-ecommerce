@@ -17,4 +17,10 @@ router.get('/users', authAdminController.getSystemUsers);
  */
 router.post('/users', authAdminController.createStaff);
 
+router.get('/customers', authAdminController.getCustomers);
+router.patch('/customers/:id/status', authAdminController.updateCustomerStatus);
+
+router.get('/reviews', authAdminController.getProductReviews);
+router.delete('/reviews/:id', authAdminController.deleteProductReview);
+
 module.exports = router;

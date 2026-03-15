@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useCart } from "../context/CartContext"
+import { useProducts } from "../context/ProductContext"
+import * as productApi from "../services/productApi"
+import { getImageUrl } from "../config/api"
 import {
   FiCheckCircle,
   FiChevronRight,
@@ -11,155 +14,377 @@ import {
   FiMinus,
   FiPlus,
   FiRotateCcw,
+  FiSearch,
   FiShare2,
   FiShield,
+  FiShoppingCart,
   FiStar,
   FiTruck,
-  FiShoppingCart,
+  FiX,
 } from "react-icons/fi"
 import "../styles/ProductDetail.css"
 import Breadcrumb from "../components/Breadcrumb"
 
-const imagePool = [
-  "https://cdn2.cellphones.com.vn/insecure/rs:fill:0:358/q:90/plain/https://cellphones.com.vn/media/catalog/product/t/e/text_ng_n_10__5_117.png",
-  "https://cdn2.cellphones.com.vn/insecure/rs:fill:58:58/q:90/plain/https://cellphones.com.vn/media/catalog/product/t/e/text_ng_n_2__9_254.png",
-  "https://cdn2.cellphones.com.vn/insecure/rs:fill:0:358/q:90/plain/https://cellphones.com.vn/media/catalog/product/s/s/ssss_13__8.png",
-  "https://cdn2.cellphones.com.vn/insecure/rs:fill:0:358/q:90/plain/https://cellphones.com.vn/media/catalog/product/t/e/text_ng_n_2__10_145.png",
+const FALLBACK_IMAGE = "https://via.placeholder.com/600x400?text=Laptop"
+const MAX_COMPARE_ITEMS = 3
+const defaultPromotions = [
+  "Tặng balo laptop cao cấp trị giá 490.000đ",
+  "Giảm thêm 500.000đ cho học sinh, sinh viên",
+  "Trả góp 0% qua thẻ tín dụng",
 ]
 
-const productSeeds = [
-  { id: "0", name: "Laptop ASUS TUF Gaming F16 FX607VJ-RL034W" },
-  { id: "1", name: "Laptop ASUS TUF Gaming F16 FX607VU-RL045W" },
-  { id: "2", name: "Laptop ASUS Vivobook 16X K3605ZF-RP634W" },
-  { id: "3", name: "Laptop ASUS Zenbook 14 OLED UX3405MA" },
-  { id: "4", name: "Laptop ASUS ROG Strix G16 G614JVR" },
-  { id: "5", name: "Laptop ASUS TUF A15 FA507NUR" },
+const toText = (html = "") => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+const toNumber = (value) => Number(value || 0)
+const formatCurrency = (value) => `${Number(value || 0).toLocaleString("vi-VN")}đ`
+const formatDate = (value) => {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  return date.toLocaleDateString("vi-VN")
+}
+
+const getPrimaryImage = (productDetail, variant, imageOverride) => {
+  if (imageOverride) return imageOverride
+  return getImageUrl(
+    variant?.images?.[0]?.image_url
+    || productDetail?.images?.[0]?.image_url
+    || FALLBACK_IMAGE,
+  )
+}
+
+const getCompareSpecs = (productDetail, variant) => [
+  { label: "Loại card đồ họa", value: variant?.gpu || "Đang cập nhật" },
+  { label: "Dung lượng RAM", value: variant ? `${variant.ram_gb || 0}GB ${variant.ram_type || ""}`.trim() : "Đang cập nhật" },
+  { label: "Ổ cứng", value: variant?.storage_gb ? `${variant.storage_gb}GB` : "Đang cập nhật" },
+  { label: "Kích thước màn hình", value: productDetail?.screen_size ? `${productDetail.screen_size} inches` : "Đang cập nhật" },
+  { label: "CPU", value: variant?.cpu_name || "Đang cập nhật" },
+  { label: "Hệ điều hành", value: productDetail?.os || "Đang cập nhật" },
+  { label: "Phiên bản (SKU)", value: variant?.sku || "Đang cập nhật" },
+  { label: "Màu sắc", value: variant?.color_name || "Đang cập nhật" },
+  { label: "Tồn kho", value: `${variant?.stock_quantity ?? 0}` },
 ]
 
-const productCatalog = productSeeds.map((seed, index) => {
-  const basePrice = 22490000 + index * 900000
-  const baseImage = imagePool[index % imagePool.length]
+const buildCompareEntry = (productDetail, variantIndex = 0, imageOverride = "") => {
+  if (!productDetail) return null
+
+  const variants = productDetail.variants || []
+  const safeIndex = variants[variantIndex] ? variantIndex : 0
+  const variant = variants[safeIndex] || null
+  const price = toNumber(variant?.discount_price || variant?.original_price)
+  const oldPrice = toNumber(variant?.original_price || variant?.discount_price)
+  const displayLabel = variant
+    ? variant.sku || "SKU chưa cập nhật"
+    : "Đang cập nhật cấu hình"
 
   return {
-    id: seed.id,
-    name: seed.name,
-    brand: "ASUS",
-    category: "Laptop",
-    fullSpecs: "Intel Core i5/i7 Gen 13-14, RTX 3050/4050, SSD NVMe tốc độ cao, màn hình 16\" chuẩn màu",
-    baseImage,
-    images: [
-      baseImage,
-      imagePool[(index + 1) % imagePool.length],
-      imagePool[(index + 2) % imagePool.length],
-      imagePool[(index + 3) % imagePool.length],
-    ],
-    colors: [
-      { name: "Xám Graphite", swatch: "#6b7280", extraPrice: 0, image: baseImage },
-      { name: "Đen Onyx", swatch: "#111827", extraPrice: 250000, image: imagePool[(index + 1) % imagePool.length] },
-      { name: "Trắng Bạc", swatch: "#d1d5db", extraPrice: 350000, image: imagePool[(index + 2) % imagePool.length] },
-    ],
-    configs: [
-      { label: "16GB | 512GB | RTX 3050", cpu: "Core i5-13500H", storage: "SSD 512GB", price: basePrice },
-      { label: "16GB | 1TB | RTX 4050", cpu: "Core i7-13620H", storage: "SSD 1TB", price: basePrice + 2000000 },
-      { label: "32GB | 1TB | RTX 4060", cpu: "Core i7-14650HX", storage: "SSD 1TB", price: basePrice + 4200000 },
-    ],
-    highlights: [
-      "Màn hình 16 inch 165Hz hiển thị mượt, phù hợp học tập và giải trí.",
-      "Tản nhiệt kép giúp máy vận hành ổn định khi chạy tác vụ nặng.",
-      "Bàn phím full-size có đèn nền, hành trình phím tốt cho nhập liệu lâu.",
-    ],
-    promotions: [
-      "Tặng balo gaming cao cấp trị giá 490.000đ",
-      "Giảm thêm 500.000đ cho học sinh, sinh viên (S-Student)",
-      "Trả góp 0% qua thẻ tín dụng, duyệt nhanh trong 5 phút",
-    ],
-    specTable: [
-      { label: "CPU", value: "Intel Core i7 thế hệ mới" },
-      { label: "GPU", value: "NVIDIA GeForce RTX 4050 6GB" },
-      { label: "RAM", value: "16GB DDR5 (nâng cấp tối đa 32GB)" },
-      { label: "Ổ cứng", value: "SSD NVMe PCIe 4.0 1TB" },
-      { label: "Màn hình", value: "16\" FHD+ IPS, 165Hz, 100% sRGB" },
-      { label: "Pin", value: "90Wh, hỗ trợ sạc nhanh 100W USB-C" },
-      { label: "Cổng kết nối", value: "USB-C, HDMI 2.1, RJ45, USB-A" },
-      { label: "Khối lượng", value: "Khoảng 2.2kg" },
-    ],
-    reviews: [
-      {
-        user: "Nguyễn Khôi",
-        rating: 5,
-        date: "15/02/2026",
-        content: "Máy chạy mượt, quạt êm khi làm việc văn phòng, chơi game ổn ở thiết lập high.",
-      },
-      {
-        user: "Lê Phương",
-        rating: 4,
-        date: "03/02/2026",
-        content: "Màn hình đẹp và bàn phím gõ sướng, pin đủ dùng 5-6 tiếng làm việc nhẹ.",
-      },
-    ],
-    rating: 4.8,
-    reviewCount: 126 + index * 9,
-    soldCount: 900 + index * 110,
+    productId: String(productDetail.product_id),
+    variantId: variant?.variant_id || null,
+    name: productDetail.product_name,
+    brandName: productDetail.brand_name || "Laptop",
+    image: getPrimaryImage(productDetail, variant, imageOverride),
+    price,
+    oldPrice,
+    tradeInPrice: Math.max(0, price - 3000000),
+    subtitle: [variant?.cpu_name, variant?.gpu].filter(Boolean).join(" | ") || "Đang cập nhật",
+    config: displayLabel,
+    specs: getCompareSpecs(productDetail, variant),
   }
-})
-
-const formatCurrency = (value) => `${value.toLocaleString("vi-VN")}đ`
+}
 
 export default function ProductDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { addToCart } = useCart()
+  const { products } = useProducts()
 
-  const product = useMemo(
-    () => productCatalog.find((item) => item.id === id) || productCatalog[0],
-    [id],
-  )
-
-  const [selectedImage, setSelectedImage] = useState(product.images[0])
-  const [selectedColorIndex, setSelectedColorIndex] = useState(0)
-  const [selectedConfigIndex, setSelectedConfigIndex] = useState(0)
+  const [product, setProduct] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0)
+  const [selectedImage, setSelectedImage] = useState(FALLBACK_IMAGE)
   const [quantity, setQuantity] = useState(1)
   const [activeTab, setActiveTab] = useState("overview")
   const [isFavorite, setIsFavorite] = useState(false)
   const [addMessage, setAddMessage] = useState("")
+  const [compareSelections, setCompareSelections] = useState([null, null])
+  const [compareMessage, setCompareMessage] = useState("")
+  const [compareQuery, setCompareQuery] = useState("")
+  const [showCompareResults, setShowCompareResults] = useState(false)
+  const [isComparePickerOpen, setIsComparePickerOpen] = useState(false)
+  const [isCompareDockCollapsed, setIsCompareDockCollapsed] = useState(false)
+  const [activeCompareSlot, setActiveCompareSlot] = useState(0)
+  const [compareLoadingSlot, setCompareLoadingSlot] = useState(null)
+  const [selectedColor, setSelectedColor] = useState("")
 
   useEffect(() => {
-    setSelectedImage(product.images[0])
-    setSelectedColorIndex(0)
-    setSelectedConfigIndex(0)
-    setQuantity(1)
-    setActiveTab("overview")
-    setAddMessage("")
-  }, [product])
+    const fetchDetail = async () => {
+      try {
+        setLoading(true)
+        setError("")
+        const response = await productApi.getProductById(id)
+        if (!response?.success || !response?.data) {
+          throw new Error("Không tìm thấy dữ liệu sản phẩm")
+        }
 
-  const selectedColor = product.colors[selectedColorIndex]
-  const selectedConfig = product.configs[selectedConfigIndex]
+        const detail = response.data
+        setProduct(detail)
+        setSelectedVariantIndex(0)
+        setQuantity(1)
+        setActiveTab("overview")
+        setAddMessage("")
+        setCompareSelections([null, null])
+        setCompareMessage("")
+        setCompareQuery("")
+        setShowCompareResults(false)
+        setIsComparePickerOpen(false)
+        setIsCompareDockCollapsed(false)
+        setSelectedColor(detail.variants?.[0]?.color_name || "")
 
-  const finalPrice = selectedConfig.price + selectedColor.extraPrice
-  const oldPrice = finalPrice + 2200000
-  const saving = oldPrice - finalPrice
-  const tradeInPrice = finalPrice - 3000000
+        const firstVariantImage = detail.variants?.[0]?.images?.[0]?.image_url
+        const firstProductImage = detail.images?.[0]?.image_url
+        setSelectedImage(getImageUrl(firstVariantImage || firstProductImage || FALLBACK_IMAGE))
+      } catch (err) {
+        console.error("Error fetching product detail:", err)
+        setError(err.message || "Không thể tải chi tiết sản phẩm")
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const relatedProducts = productCatalog.filter((item) => item.id !== product.id).slice(0, 4)
+    fetchDetail()
+  }, [id])
+
+  const variants = product?.variants || []
+  const selectedVariant = variants[selectedVariantIndex] || null
+
+  const colorOptions = useMemo(() => {
+    const colorMap = new Map()
+
+    variants.forEach((variant, index) => {
+      const colorLabel = (variant.color_name || "").trim()
+      if (!colorLabel) return
+
+      const key = colorLabel.toLowerCase()
+      if (colorMap.has(key)) return
+
+      colorMap.set(key, {
+        key,
+        label: colorLabel,
+        originalIndex: index,
+        image: getPrimaryImage(product, variant),
+        price: toNumber(variant.discount_price || variant.original_price),
+      })
+    })
+
+    return Array.from(colorMap.values())
+  }, [product, variants])
+
+  const visibleVariants = useMemo(() => {
+    const normalizedColor = selectedColor.trim().toLowerCase()
+    return variants
+      .map((variant, index) => ({ ...variant, originalIndex: index }))
+      .filter((variant) => {
+        if (!normalizedColor) return true
+        return String(variant.color_name || "").trim().toLowerCase() === normalizedColor
+      })
+  }, [selectedColor, variants])
+
+  const currentImages = useMemo(() => {
+    const variantImages = (selectedVariant?.images || []).map((img) => getImageUrl(img.image_url))
+    const productImages = (product?.images || []).map((img) => getImageUrl(img.image_url))
+    const merged = [...variantImages, ...productImages].filter(Boolean)
+    return merged.length > 0 ? [...new Set(merged)] : [FALLBACK_IMAGE]
+  }, [selectedVariant, product])
+
+  useEffect(() => {
+    if (!currentImages.includes(selectedImage)) {
+      setSelectedImage(currentImages[0])
+    }
+  }, [currentImages, selectedImage])
+
+  useEffect(() => {
+    const currentColor = selectedVariant?.color_name || ""
+    if (currentColor && currentColor !== selectedColor) {
+      setSelectedColor(currentColor)
+    }
+  }, [selectedVariant, selectedColor])
+
+  const finalPrice = selectedVariant
+    ? toNumber(selectedVariant.discount_price || selectedVariant.original_price)
+    : 0
+  const oldPrice = selectedVariant
+    ? toNumber(selectedVariant.original_price || selectedVariant.discount_price)
+    : 0
+  const saving = Math.max(0, oldPrice - finalPrice)
+  const tradeInPrice = Math.max(0, finalPrice - 3000000)
+
+  const highlights = (product?.highlight_features || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  const fullSpecs = selectedVariant
+    ? `${selectedVariant.cpu_name || "CPU"} | ${selectedVariant.gpu || "GPU"} | ${selectedVariant.ram_gb || 0}GB ${selectedVariant.ram_type || ""} | ${selectedVariant.storage_gb || 0}GB`
+    : "Đang cập nhật cấu hình"
+
+  const specTable = [
+    { label: "CPU", value: selectedVariant?.cpu_name || "Đang cập nhật" },
+    { label: "GPU", value: selectedVariant?.gpu || "Đang cập nhật" },
+    { label: "RAM", value: selectedVariant ? `${selectedVariant.ram_gb}GB ${selectedVariant.ram_type || ""}` : "Đang cập nhật" },
+    { label: "Ổ cứng", value: selectedVariant ? `${selectedVariant.storage_gb}GB` : "Đang cập nhật" },
+    { label: "Phiên bản (SKU)", value: selectedVariant?.sku || "Đang cập nhật" },
+    { label: "Màu sắc", value: selectedVariant?.color_name || "Đang cập nhật" },
+    { label: "Màn hình", value: product?.screen_size ? `${product.screen_size} inch` : "Đang cập nhật" },
+    { label: "Khối lượng", value: product?.weight_kg ? `${product.weight_kg} kg` : "Đang cập nhật" },
+    { label: "Hệ điều hành", value: product?.os || "Đang cập nhật" },
+  ]
+
+  const reviewCount = product?.reviews?.length || 0
+  const avgRating = reviewCount > 0
+    ? (product.reviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / reviewCount).toFixed(1)
+    : "0.0"
+
+  const relatedProducts = products
+    .filter((item) => String(item.id) !== String(id))
+    .slice(0, 4)
+
+  const compareCandidates = useMemo(() => {
+    const others = products.filter((item) => String(item.id) !== String(id))
+    const prioritized = others.filter(
+      (item) => item.brand_id === String(product?.brand_id || "") || item.category_id === String(product?.category_id || ""),
+    )
+    const fallback = others.filter(
+      (item) => item.brand_id !== String(product?.brand_id || "") && item.category_id !== String(product?.category_id || ""),
+    )
+    const merged = [...prioritized, ...fallback]
+    const normalizedQuery = compareQuery.trim().toLowerCase()
+
+    if (!normalizedQuery) {
+      return merged.slice(0, 12)
+    }
+
+    return merged.filter((item) => {
+      const searchable = `${item.name} ${item.brand} ${item.config} ${item.cpu} ${item.graphics}`.toLowerCase()
+      return searchable.includes(normalizedQuery)
+    }).slice(0, 12)
+  }, [compareQuery, id, product, products])
+
+  const primaryCompareItem = useMemo(
+    () => buildCompareEntry(product, selectedVariantIndex, selectedImage),
+    [product, selectedImage, selectedVariantIndex],
+  )
+
+  const compareSlots = [primaryCompareItem, ...compareSelections]
+  const compareItems = compareSlots.filter(Boolean)
+  const selectedCompareCount = compareItems.length
+  const canCompare = selectedCompareCount >= 2
+
+  useEffect(() => {
+    if (!isComparePickerOpen && !showCompareResults) return undefined
+
+    const previousBodyOverflow = document.body.style.overflow
+    const handleKeyDown = (event) => {
+      if (event.key !== "Escape") return
+
+      if (isComparePickerOpen) {
+        setIsComparePickerOpen(false)
+      } else if (showCompareResults) {
+        setShowCompareResults(false)
+      }
+    }
+
+    document.body.style.overflow = "hidden"
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isComparePickerOpen, showCompareResults])
 
   const breadcrumbItems = [
     { label: "Trang chủ", path: "/" },
     { label: "Laptop", path: "/" },
-    { label: product.brand, path: "/" },
-    { label: product.name },
+    { label: product?.brand_name || "Sản phẩm", path: "/" },
+    { label: product?.product_name || "Chi tiết" },
   ]
 
   const handleDecrease = () => setQuantity((prev) => Math.max(1, prev - 1))
   const handleIncrease = () => setQuantity((prev) => prev + 1)
 
+  const handleSelectColor = (color) => {
+    setSelectedColor(color)
+    const normalizedColor = String(color || "").trim().toLowerCase()
+    const matchedIndex = variants.findIndex(
+      (variant) => String(variant.color_name || "").trim().toLowerCase() === normalizedColor,
+    )
+    if (matchedIndex >= 0) {
+      setSelectedVariantIndex(matchedIndex)
+    }
+  }
+
+  const handleOpenComparePicker = (slotIndex) => {
+    setCompareMessage("")
+    setActiveCompareSlot(slotIndex)
+    setCompareQuery("")
+    setIsCompareDockCollapsed(false)
+    setIsComparePickerOpen(true)
+  }
+
+  const handleRemoveCompareProduct = (slotIndex) => {
+    setCompareSelections((prev) => prev.map((item, index) => (index === slotIndex ? null : item)))
+    setCompareMessage("")
+    if (selectedCompareCount <= 2) {
+      setShowCompareResults(false)
+    }
+  }
+
+  const handleSelectCompareProduct = async (candidateId) => {
+    try {
+      setCompareLoadingSlot(activeCompareSlot)
+      setCompareMessage("")
+      const response = await productApi.getProductById(candidateId)
+      if (!response?.success || !response?.data) {
+        throw new Error("Không tải được sản phẩm để so sánh")
+      }
+
+      const nextEntry = buildCompareEntry(response.data)
+      setCompareSelections((prev) => prev.map((item, index) => (index === activeCompareSlot ? nextEntry : item)))
+      setIsComparePickerOpen(false)
+    } catch (err) {
+      console.error("Error selecting compare product:", err)
+      setCompareMessage(err.message || "Không thể thêm sản phẩm vào danh sách so sánh")
+    } finally {
+      setCompareLoadingSlot(null)
+    }
+  }
+
+  const handleCompareNow = () => {
+    if (!canCompare) {
+      setCompareMessage("Vui lòng chọn thêm ít nhất 1 sản phẩm để so sánh")
+      return
+    }
+
+    setCompareMessage("")
+    setShowCompareResults(true)
+    setIsCompareDockCollapsed(false)
+  }
+
   const handleAddToCart = () => {
+    if (!selectedVariant) {
+      setAddMessage("Sản phẩm chưa có phiên bản khả dụng")
+      return
+    }
+
     const payload = {
-      id: `${product.id}-${selectedConfigIndex}-${selectedColorIndex}`,
-      name: product.name,
-      config: selectedConfig.label,
-      color: selectedColor.name,
+      id: `${product.product_id}-${selectedVariant.variant_id}`,
+      name: product.product_name,
+      config: `${selectedVariant.ram_gb}GB ${selectedVariant.ram_type || ""} | ${selectedVariant.storage_gb}GB | ${selectedVariant.gpu || ""}`,
+      color: selectedVariant.color_name || "Default",
       price: finalPrice,
       image: selectedImage,
+      variantId: selectedVariant.variant_id,
+      productId: product.product_id,
     }
 
     addToCart(payload, quantity)
@@ -173,24 +398,47 @@ export default function ProductDetail() {
 
   const subtotal = finalPrice * quantity
 
+  if (loading) {
+    return (
+      <div className="pd-page">
+        <div className="pd-container">
+          <div className="pd-card" style={{ padding: "20px" }}>Đang tải chi tiết sản phẩm...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !product) {
+    return (
+      <div className="pd-page">
+        <div className="pd-container">
+          <div className="pd-card" style={{ padding: "20px" }}>
+            <p style={{ margin: 0, color: "#b91c1c" }}>{error || "Không tìm thấy sản phẩm"}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <Breadcrumb items={breadcrumbItems} />
       <div className="pd-page">
-        <div className="pd-container">
+        <div className="pd-container pd-container-with-compare">
           <section className="pd-main">
             <div className="pd-card pd-gallery">
               <div className="pd-main-image-wrap">
-                <img src={selectedImage} alt={product.name} className="pd-main-image" />
+                <img src={selectedImage} alt={product.product_name} className="pd-main-image" />
               </div>
+
               <div className="pd-thumbs">
-                {product.images.map((image, index) => (
+                {currentImages.map((image, index) => (
                   <button
-                    key={`${product.id}-thumb-${index}`}
+                    key={`${product.product_id}-thumb-${index}`}
                     className={`pd-thumb ${selectedImage === image ? "active" : ""}`}
                     onClick={() => setSelectedImage(image)}
                   >
-                    <img src={image} alt={`${product.name} - ${index + 1}`} />
+                    <img src={image} alt={`${product.product_name} - ${index + 1}`} />
                   </button>
                 ))}
               </div>
@@ -198,7 +446,7 @@ export default function ProductDetail() {
               <div className="pd-highlight-box">
                 <h3>Tính năng nổi bật</h3>
                 <ul>
-                  {product.highlights.map((feature) => (
+                  {(highlights.length > 0 ? highlights : ["Hiệu năng mạnh mẽ", "Thiết kế bền bỉ", "Phù hợp học tập và làm việc"]).map((feature) => (
                     <li key={feature}>
                       <FiCheckCircle />
                       <span>{feature}</span>
@@ -211,12 +459,15 @@ export default function ProductDetail() {
             <div className="pd-summary">
               <div className="pd-title-row">
                 <div>
-                  <h1>{product.name}</h1>
-                  <p>{product.fullSpecs}</p>
+                  <h1>{product.product_name}</h1>
+                  <p>{fullSpecs}</p>
                 </div>
                 <div className="pd-top-actions">
                   <button className={`pd-chip ${isFavorite ? "active" : ""}`} onClick={() => setIsFavorite((prev) => !prev)}>
                     <FiHeart /> {isFavorite ? "Đã yêu thích" : "Yêu thích"}
+                  </button>
+                  <button className="pd-chip" onClick={() => handleOpenComparePicker(0)}>
+                    <FiPlus /> So sánh
                   </button>
                   <button className="pd-chip">
                     <FiShare2 /> Chia sẻ
@@ -231,9 +482,9 @@ export default function ProductDetail() {
                 <div className="pd-stars">
                   <FiStar /> <FiStar /> <FiStar /> <FiStar /> <FiStar />
                 </div>
-                <span>{product.rating}/5</span>
-                <span>({product.reviewCount} đánh giá)</span>
-                <span>Đã bán {product.soldCount}+</span>
+                <span>{avgRating}/5</span>
+                <span>({reviewCount} đánh giá)</span>
+                <span>Tồn kho: {selectedVariant?.stock_quantity ?? 0}</span>
               </div>
 
               <div className="pd-card pd-price-box">
@@ -243,48 +494,74 @@ export default function ProductDetail() {
                 <div className="pd-tradein">Thu cũ lên đời từ {formatCurrency(tradeInPrice)}</div>
               </div>
 
-              <div className="pd-card">
-                <h3>Màu sắc</h3>
-                <div className="pd-color-grid">
-                  {product.colors.map((color, index) => (
-                    <button
-                      key={`${color.name}-${index}`}
-                      className={`pd-color-option ${index === selectedColorIndex ? "active" : ""}`}
-                      onClick={() => {
-                        setSelectedColorIndex(index)
-                        setSelectedImage(color.image)
-                      }}
-                    >
-                      <span className="pd-swatch" style={{ background: color.swatch }} />
-                      <span className="pd-color-name">{color.name}</span>
-                      <span className="pd-color-price">+{formatCurrency(color.extraPrice)}</span>
-                    </button>
-                  ))}
+              <div className="pd-card pd-color-card">
+                <div className="pd-block-head">
+                  <h3>Màu sắc</h3>
+                  <p>Chọn màu sắc riêng trước khi chọn phiên bản cấu hình.</p>
                 </div>
+
+                {colorOptions.length > 0 ? (
+                  <div className="pd-color-picker">
+                    <div className="pd-color-grid">
+                      {colorOptions.map((colorOption) => (
+                        <button
+                          key={`color-${colorOption.key}`}
+                          className={`pd-color-option ${selectedColor === colorOption.label ? "active" : ""}`}
+                          onClick={() => handleSelectColor(colorOption.label)}
+                        >
+                          <img src={colorOption.image} alt={colorOption.label} className="pd-color-thumb" />
+                          <div className="pd-color-meta">
+                            <span className="pd-color-name">{colorOption.label}</span>
+                            <span className="pd-color-price">{formatCurrency(colorOption.price)}</span>
+                          </div>
+                          <span className="pd-color-check">✓</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="pd-empty-note">Chưa có dữ liệu màu sắc cho sản phẩm này.</p>
+                )}
               </div>
 
-              <div className="pd-card">
-                <h3>Cấu hình</h3>
+              <div className="pd-card pd-version-card">
+                <div className="pd-compare-entry-head">
+                  <div>
+                    <h3>Phiên bản / Cấu hình</h3>
+                    <p>Chọn phiên bản hiện tại để dùng làm mốc khi so sánh với sản phẩm khác.</p>
+                  </div>
+                  <button className="pd-inline-compare-btn" onClick={() => handleOpenComparePicker(0)}>
+                    Thêm sản phẩm so sánh
+                  </button>
+                </div>
+
                 <div className="pd-config-grid">
-                  {product.configs.map((config, index) => (
-                    <button
-                      key={config.label}
-                      className={`pd-config-item ${index === selectedConfigIndex ? "active" : ""}`}
-                      onClick={() => setSelectedConfigIndex(index)}
-                    >
-                      <strong>{config.label}</strong>
-                      <span><FiCpu /> {config.cpu}</span>
-                      <span><FiHardDrive /> {config.storage}</span>
-                      <em>{formatCurrency(config.price)}</em>
-                    </button>
-                  ))}
+                  {visibleVariants.map((variant) => {
+                    const price = toNumber(variant.discount_price || variant.original_price)
+                    const label = variant.sku || "SKU chưa cập nhật"
+                    const index = variant.originalIndex
+
+                    return (
+                      <button
+                        key={variant.variant_id}
+                        className={`pd-config-item ${index === selectedVariantIndex ? "active" : ""}`}
+                        onClick={() => setSelectedVariantIndex(index)}
+                      >
+                        <strong>{label}</strong>
+                        <span><FiCpu /> {variant.cpu_name || "Đang cập nhật"}</span>
+                        <span><FiHardDrive /> {variant.gpu || "Đang cập nhật"}</span>
+                        <span>Tồn kho: {variant.stock_quantity}</span>
+                        <em>{formatCurrency(price)}</em>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
               <div className="pd-card">
                 <h3>Ưu đãi đi kèm</h3>
                 <ul className="pd-promo-list">
-                  {product.promotions.map((promo) => (
+                  {defaultPromotions.map((promo) => (
                     <li key={promo}>
                       <FiCheckCircle />
                       <span>{promo}</span>
@@ -328,12 +605,9 @@ export default function ProductDetail() {
 
               {activeTab === "overview" && (
                 <div className="pd-tab-content">
-                  <p>
-                    {product.name} là mẫu laptop cân bằng tốt giữa hiệu năng và tính di động, phù hợp cho học tập,
-                    làm việc lẫn giải trí đa phương tiện.
-                  </p>
+                  <p>{toText(product.description_html) || `${product.product_name} là mẫu laptop phù hợp cho học tập, làm việc và giải trí.`}</p>
                   <ul>
-                    {product.highlights.map((item) => (
+                    {(highlights.length > 0 ? highlights : ["Hiệu năng ổn định", "Thiết kế hiện đại", "Dễ dàng nâng cấp"]).map((item) => (
                       <li key={`overview-${item}`}>{item}</li>
                     ))}
                   </ul>
@@ -343,7 +617,7 @@ export default function ProductDetail() {
               {activeTab === "specs" && (
                 <div className="pd-tab-content">
                   <div className="pd-spec-table">
-                    {product.specTable.map((spec) => (
+                    {specTable.map((spec) => (
                       <div className="pd-spec-row" key={spec.label}>
                         <span>{spec.label}</span>
                         <strong>{spec.value}</strong>
@@ -355,12 +629,13 @@ export default function ProductDetail() {
 
               {activeTab === "reviews" && (
                 <div className="pd-tab-content">
-                  {product.reviews.map((review) => (
-                    <article className="pd-review-item" key={`${review.user}-${review.date}`}>
+                  {(product.reviews || []).length === 0 && <p>Chưa có đánh giá nào cho sản phẩm này.</p>}
+                  {(product.reviews || []).map((review) => (
+                    <article className="pd-review-item" key={review.review_id}>
                       <div className="pd-review-head">
-                        <strong>{review.user}</strong>
-                        <span>{"⭐".repeat(review.rating)}</span>
-                        <small>{review.date}</small>
+                        <strong>{review.reviewer_name || "Khách hàng"}</strong>
+                        <span>{"⭐".repeat(Number(review.rating || 0))}</span>
+                        <small>{formatDate(review.created_at)}</small>
                       </div>
                       <p>{review.content}</p>
                     </article>
@@ -396,17 +671,183 @@ export default function ProductDetail() {
             <div className="pd-related-grid">
               {relatedProducts.map((item) => (
                 <article className="pd-related-card" key={item.id} onClick={() => navigate(`/product/${item.id}`)}>
-                  <img src={item.baseImage} alt={item.name} />
+                  <img src={item.image || FALLBACK_IMAGE} alt={item.name} />
                   <h4>{item.name}</h4>
-                  <p>{item.configs[0].label}</p>
+                  <p>{item.config || "Đang cập nhật"}</p>
                   <div>
-                    <strong>{formatCurrency(item.configs[0].price)}</strong>
-                    <span>{formatCurrency(item.configs[0].price + 1800000)}</span>
+                    <strong>{formatCurrency(item.price)}</strong>
+                    <span>{formatCurrency(item.oldPrice || item.price)}</span>
                   </div>
                 </article>
               ))}
             </div>
           </section>
+        </div>
+
+        {isComparePickerOpen && (
+          <div className="pd-compare-picker-overlay" onClick={() => setIsComparePickerOpen(false)}>
+            <div className="pd-compare-picker" onClick={(event) => event.stopPropagation()}>
+              <div className="pd-compare-picker-search">
+                <FiSearch />
+                <input
+                  type="text"
+                  placeholder="Tìm sản phẩm muốn so sánh"
+                  value={compareQuery}
+                  onChange={(event) => setCompareQuery(event.target.value)}
+                />
+                <button onClick={() => setIsComparePickerOpen(false)}>
+                  <FiX />
+                </button>
+              </div>
+
+              <div className="pd-compare-picker-list">
+                {compareCandidates.length === 0 && (
+                  <p className="pd-compare-empty-text">Không có sản phẩm phù hợp để so sánh.</p>
+                )}
+                {compareCandidates.map((item) => {
+                  const isCurrent = String(item.id) === String(product.product_id)
+                  const isAlreadySelected = compareItems.some((entry) => entry?.productId === String(item.id))
+
+                  return (
+                    <article className="pd-compare-picker-item" key={`compare-candidate-${item.id}`}>
+                      <img src={item.image || FALLBACK_IMAGE} alt={item.name} />
+                      <div className="pd-compare-picker-content">
+                        <h4>{item.name}</h4>
+                        <p>{item.config || item.specs || "Đang cập nhật"}</p>
+                        <div>
+                          <strong>{formatCurrency(item.price)}</strong>
+                          <span>{formatCurrency(item.oldPrice || item.price)}</span>
+                        </div>
+                      </div>
+                      <button
+                        className="pd-compare-picker-btn"
+                        disabled={isCurrent || isAlreadySelected || compareLoadingSlot === activeCompareSlot}
+                        onClick={() => handleSelectCompareProduct(item.id)}
+                      >
+                        {isCurrent ? "Hiện tại" : isAlreadySelected ? "Đã chọn" : compareLoadingSlot === activeCompareSlot ? "Đang tải..." : "Chọn"}
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showCompareResults && (
+          <div className="pd-compare-results-overlay" onClick={() => setShowCompareResults(false)}>
+            <section className="pd-card pd-compare-results pd-compare-results-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="pd-section-title pd-compare-results-head">
+                <h3>So sánh {compareItems.map((item) => item.name).join(" và ")}</h3>
+                <div className="pd-compare-results-head-actions">
+                  <button className="pd-view-all" onClick={() => setShowCompareResults(false)}>
+                    Đóng bảng so sánh
+                  </button>
+                  <button className="pd-compare-modal-close" onClick={() => setShowCompareResults(false)} aria-label="Đóng so sánh">
+                    <FiX />
+                  </button>
+                </div>
+              </div>
+
+              <div className="pd-compare-hero-grid">
+                {compareSlots.map((item, slotIndex) => (
+                  <article className={`pd-compare-hero-card ${!item ? "is-empty" : ""}`} key={`compare-hero-${slotIndex}`}>
+                    {slotIndex > 0 && item && (
+                      <button className="pd-compare-remove" onClick={() => handleRemoveCompareProduct(slotIndex - 1)}>
+                        <FiX />
+                      </button>
+                    )}
+                    {item ? (
+                      <>
+                        <img src={item.image} alt={item.name} className="pd-compare-hero-image" />
+                        <p className="pd-compare-chip">{item.subtitle}</p>
+                        <strong>{item.config}</strong>
+                        <h4>{item.name}</h4>
+                        <div className="pd-compare-price-line">
+                          <span>{formatCurrency(item.price)}</span>
+                          <small>{formatCurrency(item.oldPrice || item.price)}</small>
+                        </div>
+                        <p className="pd-compare-tradein">Giá lên đời: {formatCurrency(item.tradeInPrice)}</p>
+                        <button className="pd-compare-buy-btn" onClick={() => navigate(`/product/${item.productId}`)}>
+                          Mua ngay
+                        </button>
+                      </>
+                    ) : (
+                      <button className="pd-compare-empty-action" onClick={() => handleOpenComparePicker(slotIndex - 1)}>
+                        <span>+</span>
+                        <strong>Thêm sản phẩm để so sánh</strong>
+                      </button>
+                    )}
+                  </article>
+                ))}
+              </div>
+
+              <div className="pd-compare-table-wrap">
+                <h4>Thông tin cơ bản</h4>
+                <div className="pd-compare-table">
+                  {primaryCompareItem.specs.map((spec, rowIndex) => (
+                    <div className="pd-compare-table-row" key={spec.label}>
+                      <div className="pd-compare-label">{spec.label}</div>
+                      {compareSlots.map((item, slotIndex) => (
+                        <div className="pd-compare-value" key={`${spec.label}-${item?.productId || `empty-${rowIndex}-${slotIndex}`}`}>
+                          {item?.specs[rowIndex]?.value || "-"}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        <div className={`pd-compare-dock ${isCompareDockCollapsed ? "is-collapsed" : ""}`}>
+          {isCompareDockCollapsed ? (
+            <button className="pd-compare-dock-open" onClick={() => setIsCompareDockCollapsed(false)}>
+              Mở so sánh ({selectedCompareCount}/{MAX_COMPARE_ITEMS})
+            </button>
+          ) : (
+            <div className="pd-compare-dock-inner">
+              <div className="pd-compare-dock-slots">
+                {compareSlots.map((item, slotIndex) => (
+                  <div className={`pd-compare-dock-slot ${!item ? "is-empty" : ""}`} key={`compare-slot-${slotIndex}`}>
+                    {slotIndex > 0 && item && (
+                      <button className="pd-compare-remove small" onClick={() => handleRemoveCompareProduct(slotIndex - 1)}>
+                        <FiX />
+                      </button>
+                    )}
+                    {item ? (
+                      <>
+                        <img src={item.image} alt={item.name} />
+                        <div>
+                          <strong>{item.name}</strong>
+                          <p>{item.config}</p>
+                        </div>
+                      </>
+                    ) : (
+                      <button className="pd-compare-slot-btn" onClick={() => handleOpenComparePicker(slotIndex - 1)}>
+                        <span>+</span>
+                        <strong>Chọn sản phẩm so sánh</strong>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="pd-compare-dock-actions">
+                <p>Đã chọn {selectedCompareCount} sản phẩm</p>
+                <div>
+                  <button className="pd-compare-collapse-btn" onClick={() => setIsCompareDockCollapsed(true)}>
+                    Thu gọn
+                  </button>
+                  <button className="pd-compare-submit-btn" onClick={handleCompareNow}>
+                    So sánh
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {compareMessage && <p className="pd-compare-message">{compareMessage}</p>}
         </div>
       </div>
     </>

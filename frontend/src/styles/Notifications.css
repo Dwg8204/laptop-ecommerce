@@ -114,6 +114,10 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
+.notification-item.clickable {
+  cursor: pointer;
+}
+
 .notification-item.unread {
   background: linear-gradient(to right, #fff9f9, white);
   border-left-color: #d70018;
@@ -172,6 +176,34 @@
   font-size: 14px;
   color: #666;
   line-height: 1.5;
+}
+
+.notification-meta-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.notification-type-chip,
+.notification-link-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notification-type-chip {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.notification-link-chip {
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .notification-actions {

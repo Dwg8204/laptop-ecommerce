@@ -4,25 +4,28 @@ import { useAuth } from "../context/AuthContext"
 import { useProducts } from "../context/ProductContext"
 import * as brandApi from "../services/brandApi"
 import * as categoryApi from "../services/categoryApi"
+import * as productApi from "../services/productApi"
+import * as orderApi from "../services/orderApi"
+import * as inventoryApi from "../services/inventoryApi"
+import * as adminApi from "../services/adminApi"
 import { buildApiUrl } from "../config/api"
+import { getAuthToken } from "../lib/authToken"
 import {
   FiBarChart2,
   FiBox,
   FiClipboard,
   FiCpu,
-  FiEdit,
   FiFileText,
   FiHeadphones,
   FiLayers,
   FiList,
   FiPackage,
-  FiPlus,
-  FiSave,
   FiSettings,
-  FiTrash2,
   FiUsers,
   FiBookOpen,
   FiImage,
+  FiGift,
+  FiBell,
 } from "react-icons/fi"
 import "../styles/Admin.css"
 
@@ -40,6 +43,8 @@ import OrderDetailModal from "../components/admin/OrderDetailModal"
 import AdminNews from "../components/admin/AdminNewsAPI"
 import AdminSliderAPI from "../components/admin/AdminSliderAPI"
 import AdminBranch from "../components/admin/AdminBranch"
+import AdminVouchers from "../components/admin/AdminVouchers"
+import AdminNotifications from "../components/admin/AdminNotifications"
 
 const moduleItems = [
   { id: "dashboard", label: "Dashboard", icon: FiBarChart2 },
@@ -47,40 +52,15 @@ const moduleItems = [
   { id: "branch", label: "Quản lý thương hiệu", icon: FiList },
   { id: "inventory", label: "Tồn kho", icon: FiBox },
   { id: "orders", label: "Đơn hàng", icon: FiClipboard },
+  { id: "vouchers", label: "Voucher", icon: FiGift },
   { id: "customers", label: "Khách hàng", icon: FiUsers },
   { id: "content", label: "Nội dung & đánh giá", icon: FiFileText },
   { id: "documentation", label: "Quản lý tin tức", icon: FiBookOpen },
   { id: "sliders", label: "Quản lý Banner", icon: FiImage },
+  { id: "notifications", label: "Thông báo", icon: FiBell },
   { id: "recommendation", label: "Gợi ý sản phẩm", icon: FiCpu },
   { id: "assistant", label: "Trợ lý AI", icon: FiHeadphones },
   { id: "staff", label: "Người dùng hệ thống", icon: FiSettings },
-]
-
-const initialInventory = [
-  { id: "I001", productId: "P001", productName: "ASUS TUF Gaming F16", branch: "HCM-Q1", quantity: 25, minStock: 8 },
-  { id: "I002", productId: "P002", productName: "ASUS Vivobook 16X", branch: "HN-CauGiay", quantity: 6, minStock: 10 },
-]
-
-const initialOrders = [
-  { id: "O1001", customer: "Nguyễn Văn A", type: "Thường", total: 22490000, status: "dang-xu-ly", date: new Date(Date.now() - 2*24*60*60*1000).toLocaleDateString('vi-VN'), preOrder: false, privateOrder: false, refundRequest: false },
-  { id: "O1002", customer: "Trần Minh B", type: "Pre-order", total: 19990000, status: "dang-giao", date: new Date(Date.now() - 1*24*60*60*1000).toLocaleDateString('vi-VN'), preOrder: true, privateOrder: false, refundRequest: false },
-  { id: "O1003", customer: "Lê Gia C", type: "Đơn riêng", total: 32990000, status: "da-huy", date: new Date(Date.now() - 5*24*60*60*1000).toLocaleDateString('vi-VN'), preOrder: false, privateOrder: true, refundRequest: true },
-]
-
-const initialCustomers = [
-  { id: "C001", name: "Nguyễn Văn A", segment: "than-thiet", orders: 8, totalSpent: 98700000, status: "active" },
-  { id: "C002", name: "Trần Minh B", segment: "moi", orders: 1, totalSpent: 19990000, status: "active" },
-  { id: "C003", name: "Lê Gia C", segment: "vip", orders: 20, totalSpent: 320000000, status: "locked" },
-]
-
-const initialComments = [
-  { id: "CM01", user: "khach_hang_1", product: "ASUS TUF Gaming F16", text: "Máy đẹp, chơi game ổn.", status: "pending" },
-  { id: "CM02", user: "khach_hang_2", product: "ASUS Vivobook 16X", text: "Pin hơi yếu nhưng màn hình đẹp.", status: "visible" },
-]
-
-const initialAds = [
-  { id: "AD01", title: "Sale Back To School", status: "active" },
-  { id: "AD02", title: "Flash Sale Cuối Tuần", status: "paused" },
 ]
 
 const initialAiLogs = [
@@ -93,21 +73,20 @@ const initialStaff = [
   { id: "S002", name: "Nhân viên hệ thống", role: "staff", email: "staff@laptopshop.vn" },
 ]
 
-const toCurrency = (value) => `${value.toLocaleString("vi-VN")}đ`
-
 export default function Admin() {
   const { user, loading, isAdmin } = useAuth()
   const navigate = useNavigate()
 
   const [activeModule, setActiveModule] = useState("dashboard")
 
-  const { products, addProduct, updateProduct, deleteProduct } = useProducts()
+  const { products, addProduct, addVariantToProduct, updateVariantInProduct, removeVariantFromProduct, updateProduct, deleteProduct } = useProducts()
   
   const [selectedOrder, setSelectedOrder] = useState(null)
   
 
   const [productForm, setProductForm] = useState({
     name: "",
+    version: "",
     brand: "",
     brand_id: "",
     price: "",
@@ -126,21 +105,55 @@ export default function Admin() {
     category_id: "",
     stock: "",
     image: "",
-    imageFile: null,
+    imageFiles: [],
+    imagePreviews: [],
     discount: "",
     installment: "Trả góp 0%",
     newArrival: false,
   })
   const [editingProductId, setEditingProductId] = useState("")
+  const [productVariants, setProductVariants] = useState([])
+  const [editingVariantIndex, setEditingVariantIndex] = useState(-1)
+  const [variantForm, setVariantForm] = useState({
+    sku: "",
+    cpu: "",
+    gpu: "",
+    ram: "",
+    ramType: "",
+    storage: "",
+    color: "",
+    originalPrice: "",
+    discountPrice: "",
+    stock: "",
+    imageFiles: [],
+    imagePreviews: [],
+  })
 
-  const [inventory, setInventory] = useState(initialInventory)
-  const [stockReceipts, setStockReceipts] = useState([])
-  const [stockForm, setStockForm] = useState({ productId: "P001", branch: "HCM-Q1", quantity: "" })
+  const emptyVariantForm = {
+    sku: "",
+    cpu: "",
+    gpu: "",
+    ram: "",
+    ramType: "",
+    storage: "",
+    color: "",
+    originalPrice: "",
+    discountPrice: "",
+    stock: "",
+    imageFiles: [],
+    imagePreviews: [],
+  }
 
-  const [orders, setOrders] = useState(initialOrders)
-  const [customers, setCustomers] = useState(initialCustomers)
-  const [comments, setComments] = useState(initialComments)
-  const [ads, setAds] = useState(initialAds)
+  const [inventory, setInventory] = useState([])
+  const [stockForm, setStockForm] = useState({ variantId: "", supplierName: "", quantity: "", unitImportPrice: "" })
+
+  const [orders, setOrders] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [comments, setComments] = useState([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
+  const [loadingInventory, setLoadingInventory] = useState(false)
+  const [loadingCustomers, setLoadingCustomers] = useState(false)
+  const [loadingComments, setLoadingComments] = useState(false)
 
   const [recommendationStrategy, setRecommendationStrategy] = useState("hanh-vi")
   const [aiLogs] = useState(initialAiLogs)
@@ -200,7 +213,7 @@ export default function Admin() {
   const fetchStaffUsers = async () => {
     setLoadingStaff(true)
     try {
-      const token = localStorage.getItem("token")
+      const token = getAuthToken()
       const response = await fetch(buildApiUrl("/api/auth/admin/users"), {
         headers: {
           "Authorization": `Bearer ${token}`
@@ -224,20 +237,109 @@ export default function Admin() {
     }
   }
 
-  // Load orders từ localStorage
-  useEffect(() => {
-    const storedOrders = localStorage.getItem('laptopOrders')
-    if (storedOrders) {
-      try {
-        const orderList = JSON.parse(storedOrders)
-        setOrders([...initialOrders, ...orderList])
-      } catch (error) {
-        console.error('Error parsing orders:', error)
-      }
+  const loadOrders = async () => {
+    setLoadingOrders(true)
+    try {
+      const response = await orderApi.getOrders({ limit: 100 })
+      const list = Array.isArray(response?.data) ? response.data : []
+      const mapped = list.map((order) => ({
+        id: order.order_id,
+        customer: order.customer_name,
+        type: order.order_type === "PRE_ORDER" ? "Pre-order" : "Thường",
+        total: Number(order.total_amount || 0),
+        status: order.status,
+        date: order.order_date ? new Date(order.order_date).toLocaleDateString("vi-VN") : "",
+        preOrder: order.order_type === "PRE_ORDER",
+      }))
+      setOrders(mapped)
+    } catch (error) {
+      console.error("Error loading orders:", error)
+      alert(`Không thể tải đơn hàng: ${error.message}`)
+    } finally {
+      setLoadingOrders(false)
     }
-  }, [])
+  }
 
-  const lowStockItems = useMemo(() => inventory.filter((item) => item.quantity < item.minStock), [inventory])
+  const loadInventory = async () => {
+    setLoadingInventory(true)
+    try {
+      const response = await inventoryApi.getLowStockProducts(10)
+      setInventory(Array.isArray(response?.data) ? response.data : [])
+    } catch (error) {
+      console.error("Error loading inventory:", error)
+      alert(`Không thể tải tồn kho: ${error.message}`)
+    } finally {
+      setLoadingInventory(false)
+    }
+  }
+
+  const loadCustomers = async () => {
+    setLoadingCustomers(true)
+    try {
+      const response = await adminApi.getCustomers()
+      const list = Array.isArray(response?.data) ? response.data : []
+      const mapped = list.map((item) => {
+        const orderCount = Number(item.total_orders || 0)
+        const spent = Number(item.total_spent || 0)
+        let segment = "Mới"
+        if (orderCount >= 10 || spent >= 100000000) segment = "VIP"
+        else if (orderCount >= 3 || spent >= 30000000) segment = "Thân thiết"
+
+        return {
+          id: item.user_id,
+          name: item.full_name,
+          segment,
+          orders: orderCount,
+          totalSpent: spent,
+          status: String(item.status || "ACTIVE").toLowerCase() === "locked" ? "locked" : "active",
+        }
+      })
+      setCustomers(mapped)
+    } catch (error) {
+      console.error("Error loading customers:", error)
+      alert(`Không thể tải khách hàng: ${error.message}`)
+    } finally {
+      setLoadingCustomers(false)
+    }
+  }
+
+  const loadComments = async () => {
+    setLoadingComments(true)
+    try {
+      const response = await adminApi.getProductReviews()
+      const list = Array.isArray(response?.data) ? response.data : []
+      const mapped = list.map((item) => ({
+        id: item.review_id,
+        user: item.reviewer_name,
+        product: item.product_name,
+        text: item.content || "",
+        rating: Number(item.rating || 0),
+      }))
+      setComments(mapped)
+    } catch (error) {
+      console.error("Error loading reviews:", error)
+      alert(`Không thể tải đánh giá: ${error.message}`)
+    } finally {
+      setLoadingComments(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeModule === "orders" || activeModule === "dashboard") {
+      loadOrders()
+    }
+    if (activeModule === "inventory") {
+      loadInventory()
+    }
+    if (activeModule === "customers") {
+      loadCustomers()
+    }
+    if (activeModule === "content") {
+      loadComments()
+    }
+  }, [activeModule])
+
+  const lowStockItems = useMemo(() => inventory, [inventory])
   
   const filteredProducts = useMemo(() => {
     if (!searchTerm.trim()) return products
@@ -250,8 +352,8 @@ export default function Admin() {
   }, [products, searchTerm])
 
   const revenueSummary = useMemo(() => {
-    const completed = orders.filter((order) => order.status === "hoan-thanh")
-    const processing = orders.filter((order) => order.status !== "da-huy")
+    const completed = orders.filter((order) => order.status === "COMPLETED")
+    const processing = orders.filter((order) => order.status !== "CANCELLED")
     return {
       day: 125000000,
       month: 2480000000,
@@ -259,7 +361,7 @@ export default function Admin() {
       brandAsus: 62,
       priceSegmentMid: 47,
       avgOrder: processing.length ? processing.reduce((sum, order) => sum + order.total, 0) / processing.length : 0,
-      cancelRate: Math.round((orders.filter((order) => order.status === "da-huy").length / orders.length) * 100),
+      cancelRate: orders.length ? Math.round((orders.filter((order) => order.status === "CANCELLED").length / orders.length) * 100) : 0,
       returnRate: 36,
       completedOrders: completed.length,
       preOrders: orders.filter((order) => order.preOrder).length,
@@ -293,44 +395,64 @@ export default function Admin() {
       alert('Vui lòng chọn danh mục')
       return
     }
-    if (!editingProductId && !productForm.imageFile) {
+    if (!editingProductId && (!productForm.imageFiles || productForm.imageFiles.length === 0)) {
       alert('Vui lòng upload hình ảnh sản phẩm')
       return
     }
+    if (!editingProductId && productVariants.length === 0) {
+      alert('Vui lòng thêm ít nhất một phiên bản cho sản phẩm')
+      return
+    }
+    if (!editingProductId && productVariants.some((variant) => !variant.imageFiles || variant.imageFiles.length === 0)) {
+      alert('Mỗi phiên bản sản phẩm phải có tối thiểu 1 ảnh')
+      return
+    }
 
-    const autoConfig = `${productForm.ram}${productForm.ramType ? ` ${productForm.ramType}` : ""} | ${productForm.storage} | ${productForm.screenSize}`
-    const autoSpecs = `${productForm.cpu} | ${productForm.graphics} | ${productForm.os}${productForm.weightKg ? ` | ${productForm.weightKg} kg` : ""}`
+    const firstVariant = productVariants[0]
+    const basePrice = firstVariant ? Number(firstVariant.discountPrice || firstVariant.originalPrice || 0) : Number(productForm.price)
+    const baseOldPrice = firstVariant ? Number(firstVariant.originalPrice || firstVariant.discountPrice || 0) : Number(productForm.oldPrice || productForm.price)
+    const baseRam = firstVariant?.ram || productForm.ram
+    const baseRamType = firstVariant?.ramType || productForm.ramType
+    const baseStorage = firstVariant?.storage || productForm.storage
+    const baseCpu = firstVariant?.cpu || productForm.cpu
+    const baseGraphics = firstVariant?.gpu || productForm.graphics
+    const baseVersion = firstVariant?.color || productForm.version
+    const baseStock = firstVariant ? Number(firstVariant.stock || 0) : Number(productForm.stock)
+
+    const autoConfig = `${baseRam}${baseRamType ? ` ${baseRamType}` : ""} | ${baseStorage} | ${productForm.screenSize}`
+    const autoSpecs = `${baseCpu} | ${baseGraphics} | ${productForm.os}${productForm.weightKg ? ` | ${productForm.weightKg} kg` : ""}`
 
     const payload = {
       name: productForm.name,
       brand: productForm.brand,
       brand_id: productForm.brand_id, // Pass brand_id for API
       category_id: productForm.category_id, // Pass category_id for API
-      price: Number(productForm.price),
-      oldPrice: Number(productForm.oldPrice || productForm.price),
-      storage: productForm.storage,
-      ram: productForm.ram,
-      ramType: productForm.ramType,
-      cpu: productForm.cpu,
+      price: basePrice,
+      oldPrice: baseOldPrice,
+      storage: baseStorage,
+      ram: baseRam,
+      ramType: baseRamType,
+      version: baseVersion,
+      cpu: baseCpu,
       screenSize: productForm.screenSize,
       weightKg: productForm.weightKg,
       os: productForm.os,
-      graphics: productForm.graphics,
+      graphics: baseGraphics,
       features: productForm.features,
       hasAI: productForm.hasAI,
       series: productForm.series,
-      stock: Number(productForm.stock),
+      stock: baseStock,
       config: autoConfig,
       specs: autoSpecs,
       image: productForm.image || "https://cdn2.cellphones.com.vn/insecure/rs:fill:0:358/q:90/plain/https://cellphones.com.vn/media/catalog/product/t/e/text_ng_n_10__5_117.png",
       discount:
         productForm.discount ||
-        `Giảm ${Math.round(((Number(productForm.oldPrice) - Number(productForm.price)) / Number(productForm.oldPrice)) * 100)}%`,
+        (baseOldPrice > basePrice ? `Giảm ${Math.round(((baseOldPrice - basePrice) / baseOldPrice) * 100)}%` : ""),
       installment: productForm.installment,
       newArrival: productForm.newArrival,
-      // Add file objects for API upload
-      productImages: productForm.imageFile, // File object
-      variantImages: productForm.imageFile ? [productForm.imageFile] : [], // Single file for variant images
+      productImages: productForm.imageFiles,
+      variantImages: productVariants.map((variant) => variant.imageFiles || []),
+      productVariants,
     }
 
     try {
@@ -343,6 +465,7 @@ export default function Admin() {
       // Clear form on success
       setProductForm({
         name: "",
+        version: "",
         brand: "",
         brand_id: "",
         price: "",
@@ -361,11 +484,15 @@ export default function Admin() {
         category_id: "",
         stock: "",
         image: "",
-        imageFile: null,
+        imageFiles: [],
+        imagePreviews: [],
         discount: "",
         installment: "Trả góp 0%",
         newArrival: false,
       })
+      setProductVariants([])
+      setEditingVariantIndex(-1)
+      setVariantForm(emptyVariantForm)
       setEditingProductId("")
     } catch (error) {
       console.error('Error submitting product:', error)
@@ -373,16 +500,110 @@ export default function Admin() {
     }
   }
 
-  const handleEditProduct = (product) => {
+  const handleAddVariant = async () => {
+    if (!variantForm.sku || !variantForm.color || !variantForm.cpu || !variantForm.gpu || !variantForm.ram || !variantForm.storage || !variantForm.originalPrice) {
+      alert('Vui lòng điền đầy đủ SKU, màu và thông tin phiên bản')
+      return
+    }
+    const previewCount = variantForm.imagePreviews?.length || 0
+    if ((!variantForm.imageFiles || variantForm.imageFiles.length === 0) && previewCount === 0) {
+      alert('Mỗi phiên bản cần tối thiểu 1 ảnh')
+      return
+    }
+
+    const newVariant = {
+      ...variantForm,
+      originalPrice: Number(variantForm.originalPrice),
+      discountPrice: variantForm.discountPrice ? Number(variantForm.discountPrice) : null,
+      stock: Number(variantForm.stock || 0),
+    }
+
+    if (editingVariantIndex >= 0) {
+      const existingVariant = productVariants[editingVariantIndex]
+      if (editingProductId && existingVariant?.variant_id) {
+        try {
+          await updateVariantInProduct(editingProductId, {
+            ...newVariant,
+            variant_id: existingVariant.variant_id,
+          }, newVariant.imageFiles || [])
+          alert('Đã cập nhật phiên bản trong cơ sở dữ liệu thành công')
+        } catch (error) {
+          alert(`Không thể cập nhật phiên bản: ${error.message}`)
+          return
+        }
+      }
+
+      const updated = [...productVariants]
+      updated[editingVariantIndex] = {
+        ...existingVariant,
+        ...newVariant,
+        imagePreviews: newVariant.imagePreviews?.length
+          ? newVariant.imagePreviews
+          : (existingVariant?.imagePreviews || []),
+      }
+      setProductVariants(updated)
+      setEditingVariantIndex(-1)
+    } else {
+      if (editingProductId) {
+        try {
+          await addVariantToProduct(editingProductId, newVariant, newVariant.imageFiles || [])
+          alert('Đã thêm phiên bản vào cơ sở dữ liệu thành công')
+        } catch (error) {
+          alert(`Không thể thêm phiên bản: ${error.message}`)
+          return
+        }
+      }
+      setProductVariants((prev) => [...prev, newVariant])
+    }
+
+    setVariantForm(emptyVariantForm)
+  }
+
+  const handleEditVariant = (index) => {
+    setEditingVariantIndex(index)
+    setVariantForm({
+      sku: "",
+      ...productVariants[index],
+    })
+  }
+
+  const handleDeleteVariant = async (index) => {
+    const variant = productVariants[index]
+    const label = variant.sku || variant.color || `Phiên bản #${index + 1}`
+    if (!window.confirm(`Bạn có chắc muốn xóa phiên bản "${label}" không?`)) return
+
+    if (editingProductId && variant?.variant_id) {
+      try {
+        await removeVariantFromProduct(editingProductId, variant.variant_id)
+        alert(`Đã ngừng kinh doanh phiên bản "${label}" thành công`)
+      } catch (error) {
+        alert(`Không thể xóa phiên bản: ${error.message}`)
+        return
+      }
+    }
+
+    setProductVariants((prev) => prev.filter((_, i) => i !== index))
+    if (editingVariantIndex === index) {
+      setEditingVariantIndex(-1)
+      setVariantForm(emptyVariantForm)
+    } else if (editingVariantIndex > index) {
+      setEditingVariantIndex((prev) => prev - 1)
+    }
+  }
+
+  const handleEditProduct = async (product) => {
     setEditingProductId(product.id)
     setProductForm({
       name: product.name,
+      brand_id: product.brand_id || "",
+      category_id: product.category_id || "",
       brand: product.brand,
       price: String(product.price),
       oldPrice: String(product.oldPrice || product.price),
       storage: product.storage,
       ram: product.ram,
       ramType: product.ramType || "",
+      version: product.version || "",
       cpu: product.cpu,
       screenSize: product.screenSize,
       weightKg: product.weightKg || "",
@@ -393,10 +614,44 @@ export default function Admin() {
       series: product.series,
       stock: String(product.stock),
       image: product.image,
+      imageFiles: [],
+      imagePreviews: product.image ? [product.image] : [],
       discount: product.discount,
       installment: product.installment || "Trả góp 0%",
       newArrival: product.newArrival || false,
     })
+    setProductVariants([])
+    setEditingVariantIndex(-1)
+    setVariantForm(emptyVariantForm)
+
+    try {
+      const detailResponse = await productApi.getProductById(product.id)
+      const productDetail = detailResponse?.data
+      if (Array.isArray(productDetail?.variants)) {
+        const mappedVariants = productDetail.variants.map((variant) => ({
+          variant_id: variant.variant_id,
+          sku: variant.sku || "",
+          cpu: variant.cpu_name || "",
+          gpu: variant.gpu || "",
+          ram: variant.ram_gb != null ? String(variant.ram_gb) : "",
+          ramType: product.ramType || "",
+          storage: variant.storage_gb != null ? String(variant.storage_gb) : "",
+          color: variant.color_name || "",
+          originalPrice: Number(variant.original_price || 0),
+          discountPrice: variant.discount_price != null ? Number(variant.discount_price) : null,
+          stock: Number(variant.stock_quantity || 0),
+          imageFiles: [],
+          imagePreviews: Array.isArray(variant.images)
+            ? variant.images.map((img) => img.image_url).filter(Boolean)
+            : [],
+        }))
+        setProductVariants(mappedVariants)
+      }
+    } catch (error) {
+      console.error('Error loading product detail variants:', error)
+      alert('Không thể tải danh sách phiên bản chi tiết, bạn vẫn có thể chỉnh sửa thông tin cơ bản của sản phẩm.')
+    }
+
     setActiveModule("products")
   }
 
@@ -407,67 +662,104 @@ export default function Admin() {
     }
   }
 
-  const handleStockImport = (event) => {
+  const handleStockImport = async (event) => {
     event.preventDefault()
-    const qty = Number(stockForm.quantity)
-    if (!qty || qty <= 0) return
+    try {
+      const variantId = Number(stockForm.variantId)
+      const quantity = Number(stockForm.quantity)
+      const unitImportPrice = Number(stockForm.unitImportPrice)
 
-    const selectedProduct = products.find((product) => product.id === stockForm.productId)
-    if (!selectedProduct) return
-
-    setInventory((prev) => {
-      const index = prev.findIndex((item) => item.productId === stockForm.productId && item.branch === stockForm.branch)
-      if (index > -1) {
-        return prev.map((item, idx) => (idx === index ? { ...item, quantity: item.quantity + qty } : item))
+      if (!variantId || !quantity || !unitImportPrice) {
+        alert("Vui lòng điền đầy đủ variant ID, số lượng và giá nhập")
+        return
       }
-      return [
-        ...prev,
-        {
-          id: `I${String(prev.length + 1).padStart(3, "0")}`,
-          productId: stockForm.productId,
-          productName: selectedProduct.name,
-          branch: stockForm.branch,
-          quantity: qty,
-          minStock: 8,
-        },
-      ]
-    })
 
-    setStockReceipts((prev) => [
-      { id: `R${String(prev.length + 1).padStart(3, "0")}`, productName: selectedProduct.name, branch: stockForm.branch, quantity: qty, date: new Date().toLocaleString("vi-VN") },
-      ...prev,
-    ])
+      await inventoryApi.createImportReceipt({
+        supplier_name: stockForm.supplierName,
+        details: [
+          {
+            variant_id: variantId,
+            import_quantity: quantity,
+            unit_import_price: unitImportPrice,
+          },
+        ],
+      })
 
-    setStockForm((prev) => ({ ...prev, quantity: "" }))
+      alert("Tạo phiếu nhập thành công")
+      setStockForm({ variantId: "", supplierName: "", quantity: "", unitImportPrice: "" })
+      await loadInventory()
+    } catch (error) {
+      console.error("Error creating import receipt:", error)
+      alert(`Không thể tạo phiếu nhập: ${error.message}`)
+    }
   }
 
-  const updateOrderStatus = (orderId, status) => {
-    setOrders((prev) => {
-      const updated = prev.map((order) => (order.id === orderId ? { ...order, status } : order))
-      // Lưu vào localStorage nếu order có trong stored orders
-      const storedOrders = localStorage.getItem('laptopOrders')
-      if (storedOrders) {
-        try {
-          const orderList = JSON.parse(storedOrders)
-          const updatedStored = orderList.map((order) => (order.id === orderId ? { ...order, status } : order))
-          localStorage.setItem('laptopOrders', JSON.stringify(updatedStored))
-        } catch (error) {
-          console.error('Error updating order in localStorage:', error)
-        }
-      }
-      return updated
-    })
+  const updateOrderStatus = async (orderId, status) => {
+    try {
+      await orderApi.updateOrderStatus(orderId, status)
+      await loadOrders()
+    } catch (error) {
+      console.error("Error updating order status:", error)
+      alert(`Không thể cập nhật trạng thái đơn hàng: ${error.message}`)
+    }
+  }
+
+  const openOrderDetail = async (orderId) => {
+    try {
+      const response = await orderApi.getOrderById(orderId)
+      const order = response?.data
+      if (!order) return
+
+      setSelectedOrder({
+        id: order.order_id,
+        customer: order.customer_name,
+        phone: order.receiver_phone,
+        address: [order.specific_address, order.ward, order.district, order.province].filter(Boolean).join(", "),
+        type: order.order_type === "PRE_ORDER" ? "Pre-order" : "Thường",
+        status: order.status,
+        total: Number(order.total_amount || 0),
+        date: order.order_date ? new Date(order.order_date).toLocaleDateString("vi-VN") : "",
+        items: Array.isArray(order.details)
+          ? order.details.map((item) => ({
+              id: item.order_detail_id,
+              name: `${item.product_name} ${item.color_name ? `- ${item.color_name}` : ""}`,
+              quantity: Number(item.quantity || 0),
+              price: Number(item.price_at_purchase || 0),
+            }))
+          : [],
+      })
+    } catch (error) {
+      console.error("Error loading order detail:", error)
+      alert(`Không thể tải chi tiết đơn hàng: ${error.message}`)
+    }
   }
 
   const renderOrderDetailModal = () => (
     <OrderDetailModal selectedOrder={selectedOrder} setSelectedOrder={setSelectedOrder} />
   )
 
-  const handleCustomerSegment = (customerId, segment) => setCustomers((prev) => prev.map((customer) => (customer.id === customerId ? { ...customer, segment } : customer)))
-  const toggleCustomerLock = (customerId) => setCustomers((prev) => prev.map((customer) => (customer.id === customerId ? { ...customer, status: customer.status === "locked" ? "active" : "locked" } : customer)))
-  const updateCommentStatus = (commentId, status) => setComments((prev) => prev.map((comment) => (comment.id === commentId ? { ...comment, status } : comment)))
-  const removeComment = (commentId) => setComments((prev) => prev.filter((comment) => comment.id !== commentId))
-  const toggleAdStatus = (adId) => setAds((prev) => prev.map((ad) => (ad.id === adId ? { ...ad, status: ad.status === "active" ? "paused" : "active" } : ad)))
+  const toggleCustomerLock = async (customerId) => {
+    try {
+      const current = customers.find((customer) => customer.id === customerId)
+      if (!current) return
+      const nextStatus = current.status === "locked" ? "ACTIVE" : "LOCKED"
+      await adminApi.updateCustomerStatus(customerId, nextStatus)
+      await loadCustomers()
+    } catch (error) {
+      console.error("Error toggling customer lock:", error)
+      alert(`Không thể cập nhật trạng thái khách hàng: ${error.message}`)
+    }
+  }
+
+  const removeComment = async (commentId) => {
+    try {
+      await adminApi.deleteProductReview(commentId)
+      await loadComments()
+    } catch (error) {
+      console.error("Error deleting review:", error)
+      alert(`Không thể xóa đánh giá: ${error.message}`)
+    }
+  }
 
   const createStaff = async (event) => {
     event.preventDefault()
@@ -484,7 +776,7 @@ export default function Admin() {
     }
 
     try {
-      const token = localStorage.getItem("token")
+      const token = getAuthToken()
       const response = await fetch(buildApiUrl("/api/auth/admin/users"), {
         method: "POST",
         headers: {
@@ -524,14 +816,12 @@ export default function Admin() {
     if (activeModule === "dashboard") return <AdminDashboard revenueSummary={revenueSummary} />
     if (activeModule === "products") return (
       <AdminProducts 
-        products={products}
         filteredProducts={filteredProducts}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         productForm={productForm}
         setProductForm={setProductForm}
         editingProductId={editingProductId}
-        setEditingProductId={setEditingProductId}
         handleProductSubmit={handleProductSubmit}
         handleEditProduct={handleEditProduct}
         handleDeleteProduct={handleDeleteProduct}
@@ -539,43 +829,52 @@ export default function Admin() {
         categories={categories}
         loadingBrands={loadingBrands}
         loadingCategories={loadingCategories}
+        productVariants={productVariants}
+        editingVariantIndex={editingVariantIndex}
+        setEditingVariantIndex={setEditingVariantIndex}
+        variantForm={variantForm}
+        setVariantForm={setVariantForm}
+        handleAddVariant={handleAddVariant}
+        handleEditVariant={handleEditVariant}
+        handleDeleteVariant={handleDeleteVariant}
       />
     )
     if (activeModule === "branch") return <AdminBranch />
     if (activeModule === "inventory") return (
       <AdminInventory 
-        products={products}
         stockForm={stockForm}
         setStockForm={setStockForm}
         handleStockImport={handleStockImport}
         lowStockItems={lowStockItems}
+        loadingInventory={loadingInventory}
       />
     )
     if (activeModule === "orders") return (
       <AdminOrders 
         orders={orders}
         updateOrderStatus={updateOrderStatus}
-        setSelectedOrder={setSelectedOrder}
+        openOrderDetail={openOrderDetail}
+        loadingOrders={loadingOrders}
       />
     )
+    if (activeModule === "vouchers") return <AdminVouchers />
     if (activeModule === "customers") return (
       <AdminCustomers 
         customers={customers}
-        handleCustomerSegment={handleCustomerSegment}
         toggleCustomerLock={toggleCustomerLock}
+        loadingCustomers={loadingCustomers}
       />
     )
     if (activeModule === "content") return (
       <AdminContent 
         comments={comments}
-        updateCommentStatus={updateCommentStatus}
         removeComment={removeComment}
-        ads={ads}
-        toggleAdStatus={toggleAdStatus}
+        loadingComments={loadingComments}
       />
     )
     if (activeModule === "documentation") return <AdminNews />
     if (activeModule === "sliders") return <AdminSliderAPI />
+    if (activeModule === "notifications") return <AdminNotifications />
     if (activeModule === "recommendation") return (
       <AdminRecommendation 
         recommendationStats={recommendationStats}

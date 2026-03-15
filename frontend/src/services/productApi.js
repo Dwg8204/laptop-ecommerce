@@ -1,13 +1,7 @@
 import { buildApiUrl } from '../config/api'
+import { getAuthToken } from '../lib/authToken'
 
 const API_BASE = buildApiUrl('/api/products')
-
-/**
- * Get auth token from localStorage
- */
-const getAuthToken = () => {
-  return localStorage.getItem('token')
-}
 
 /**
  * Get all products with pagination
@@ -95,6 +89,12 @@ export const createProduct = async (productData) => {
         Array.from(productData.productImages).forEach(file => {
           formData.append('productImages', file)
         })
+      } else if (Array.isArray(productData.productImages)) {
+        productData.productImages.forEach((file) => {
+          if (file instanceof File) {
+            formData.append('productImages', file)
+          }
+        })
       } else if (productData.productImages instanceof File) {
         formData.append('productImages', productData.productImages)
       }
@@ -106,6 +106,12 @@ export const createProduct = async (productData) => {
         if (variantImgs instanceof FileList) {
           Array.from(variantImgs).forEach(file => {
             formData.append(`variant_${index}_images`, file)
+          })
+        } else if (Array.isArray(variantImgs)) {
+          variantImgs.forEach((file) => {
+            if (file instanceof File) {
+              formData.append(`variant_${index}_images`, file)
+            }
           })
         } else if (variantImgs instanceof File) {
           formData.append(`variant_${index}_images`, variantImgs)
@@ -193,6 +199,12 @@ export const updateProduct = async (id, productData) => {
         Array.from(productData.productImages).forEach(file => {
           formData.append('productImages', file)
         })
+      } else if (Array.isArray(productData.productImages)) {
+        productData.productImages.forEach((file) => {
+          if (file instanceof File) {
+            formData.append('productImages', file)
+          }
+        })
       } else if (productData.productImages instanceof File) {
         formData.append('productImages', productData.productImages)
       }
@@ -203,6 +215,12 @@ export const updateProduct = async (id, productData) => {
         if (variantImgs instanceof FileList) {
           Array.from(variantImgs).forEach(file => {
             formData.append(`variant_${index}_images`, file)
+          })
+        } else if (Array.isArray(variantImgs)) {
+          variantImgs.forEach((file) => {
+            if (file instanceof File) {
+              formData.append(`variant_${index}_images`, file)
+            }
           })
         } else if (variantImgs instanceof File) {
           formData.append(`variant_${index}_images`, variantImgs)
@@ -261,6 +279,155 @@ export const deleteProduct = async (id) => {
     return data
   } catch (error) {
     console.error(`Error deleting product ${id}:`, error)
+    throw error
+  }
+}
+
+/**
+ * Add one variant to an existing product
+ * @param {number|string} productId - Product ID
+ * @param {Object} variantData - Variant data
+ * @param {File[]|FileList} variantImages - Optional images for variant
+ */
+export const addVariantToProduct = async (productId, variantData, variantImages = []) => {
+  try {
+    const formData = new FormData()
+
+    // Send variant as JSON string to match backend parser branch reliably.
+    formData.append('variant', JSON.stringify(variantData))
+
+    if (variantImages instanceof FileList) {
+      Array.from(variantImages).forEach((file) => {
+        formData.append('variantImages', file)
+      })
+    } else if (Array.isArray(variantImages)) {
+      variantImages.forEach((file) => {
+        if (file instanceof File) {
+          formData.append('variantImages', file)
+        }
+      })
+    }
+
+    const token = getAuthToken()
+    const headers = {}
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${API_BASE}/${productId}/variants`, {
+      method: 'POST',
+      headers,
+      body: formData
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      const detail = Array.isArray(data?.errors) && data.errors.length > 0
+        ? `: ${data.errors.join(', ')}`
+        : ''
+      throw new Error((data.error || data.message || `HTTP ${response.status}: ${response.statusText}`) + detail)
+    }
+
+    return data
+  } catch (error) {
+    console.error(`Error adding variant to product ${productId}:`, error)
+    throw error
+  }
+}
+
+/**
+ * Update one existing variant of a product
+ * @param {number|string} productId - Product ID
+ * @param {number|string} variantId - Variant ID
+ * @param {Object} variantData - Fields to update for variant
+ * @param {File[]|FileList} variantImages - Optional new images for variant
+ */
+export const updateProductVariant = async (productId, variantId, variantData, variantImages = []) => {
+  try {
+    const formData = new FormData()
+
+    formData.append('variants_to_update', JSON.stringify([
+      {
+        variant_id: Number(variantId),
+        data: variantData,
+      },
+    ]))
+
+    if (variantImages instanceof FileList) {
+      Array.from(variantImages).forEach((file) => {
+        formData.append('newVariant_0_images_update', file)
+      })
+    } else if (Array.isArray(variantImages)) {
+      variantImages.forEach((file) => {
+        if (file instanceof File) {
+          formData.append('newVariant_0_images_update', file)
+        }
+      })
+    }
+
+    const token = getAuthToken()
+    const headers = {}
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${API_BASE}/${productId}`, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      const detail = Array.isArray(data?.errors) && data.errors.length > 0
+        ? `: ${data.errors.join(', ')}`
+        : ''
+      throw new Error((data.error || data.message || `HTTP ${response.status}: ${response.statusText}`) + detail)
+    }
+
+    return data
+  } catch (error) {
+    console.error(`Error updating variant ${variantId} of product ${productId}:`, error)
+    throw error
+  }
+}
+
+/**
+ * Soft-delete one variant by setting its status to DISCONTINUED
+ * @param {number|string} productId - Product ID
+ * @param {number|string} variantId - Variant ID
+ */
+export const deleteVariantFromProduct = async (productId, variantId) => {
+  try {
+    const formData = new FormData()
+    formData.append('variants_to_update', JSON.stringify([
+      {
+        variant_id: Number(variantId),
+        data: { status: 'DISCONTINUED' },
+      },
+    ]))
+
+    const token = getAuthToken()
+    const headers = {}
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${API_BASE}/${productId}`, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error || data.message || `HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    return data
+  } catch (error) {
+    console.error(`Error deleting variant ${variantId} of product ${productId}:`, error)
     throw error
   }
 }

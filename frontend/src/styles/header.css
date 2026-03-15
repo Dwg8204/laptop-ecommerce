@@ -11,6 +11,7 @@
 
 /* Main Header */
 .header {
+  position: fixed;
   background: #e30019;
   color: #fff;
   padding: 12px 40px;

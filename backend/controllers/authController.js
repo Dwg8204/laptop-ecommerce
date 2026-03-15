@@ -16,6 +16,7 @@ const createAuthToken = (userId, email) => jwt.sign(
 );
 
 const fetchFacebookProfile = async (accessToken) => {
+    console.log('Fetching Facebook profile with access token:', accessToken);
     if (typeof fetch !== 'function') {
         throw new Error('Node.js hiện tại không hỗ trợ fetch toàn cục');
     }
@@ -28,6 +29,7 @@ const fetchFacebookProfile = async (accessToken) => {
         const fbError = payload?.error?.message || 'Access token Facebook không hợp lệ';
         throw new Error(fbError);
     }
+    console.log(payload);
 
     return payload;
 };

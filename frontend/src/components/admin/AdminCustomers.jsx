@@ -2,12 +2,13 @@ const toCurrency = (value) => `${value.toLocaleString("vi-VN")}đ`
 
 export default function AdminCustomers({ 
   customers, 
-  handleCustomerSegment, 
-  toggleCustomerLock 
+  toggleCustomerLock,
+  loadingCustomers,
 }) {
   return (
     <section className="adm-card adm-card-pad">
       <h3>Quản lý khách hàng</h3>
+      {loadingCustomers && <p className="adm-muted">Đang tải danh sách khách hàng...</p>}
       <div className="adm-table-wrap">
         <table className="adm-table2">
           <thead>
@@ -25,13 +26,7 @@ export default function AdminCustomers({
               <tr key={customer.id}>
                 <td><strong>{customer.name}</strong></td>
                 <td>{customer.orders} đơn</td>
-                <td>
-                  <select value={customer.segment} onChange={(event) => handleCustomerSegment(customer.id, event.target.value)}>
-                    <option value="moi">Mới</option>
-                    <option value="than-thiet">Thân thiết</option>
-                    <option value="vip">VIP</option>
-                  </select>
-                </td>
+                <td>{customer.segment}</td>
                 <td className="adm-money">{toCurrency(customer.totalSpent)}</td>
                 <td>{customer.orders >= 10 ? "Mua lặp lại cao" : "Mua theo nhu cầu"}</td>
                 <td>
@@ -41,6 +36,11 @@ export default function AdminCustomers({
                 </td>
               </tr>
             ))}
+            {!loadingCustomers && customers.length === 0 && (
+              <tr>
+                <td colSpan={6} className="adm-muted">Không có khách hàng nào.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

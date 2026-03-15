@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import CategoryBar from "../components/CategoryBar"
 import BannerSlider from "../components/BannerSlider"
 import LaptopFilterSection from "../components/LaptopFilterSection"
@@ -12,6 +13,8 @@ import Footer from "../components/Footer"
 export default function Laptop() {
   const [filters, setFilters] = useState(null)
   const [sortBy, setSortBy] = useState('popular')
+  const [searchParams] = useSearchParams()
+  const selectedCategory = searchParams.get('category') || ''
 
   const handleFilterChange = (newFilters, newSortBy) => {
     setFilters(newFilters)
@@ -25,7 +28,7 @@ export default function Laptop() {
       <LaptopFilterSection />
       <FeaturedProducts />
       <FilterBar onFilterChange={handleFilterChange} />
-      <ProductListSection filters={filters} sortBy={sortBy} />
+      <ProductListSection filters={filters} sortBy={sortBy} selectedCategory={selectedCategory} />
       <HomeArticleSection />
       <QASection />
       <Footer />

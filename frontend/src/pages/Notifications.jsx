@@ -1,74 +1,77 @@
-import { useState } from 'react'
-import { FiBell, FiCheck, FiPackage, FiTag, FiTruck, FiX } from 'react-icons/fi'
+import { useEffect, useMemo, useState } from 'react'
+import { FiBell, FiCheck, FiPackage, FiSettings, FiTag, FiTruck } from 'react-icons/fi'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { useNotifications } from '../context/NotificationContext'
 import '../styles/Notifications.css'
 
-export default function Notifications() {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'order',
-      title: 'Đơn hàng đang được giao',
-      message: 'Đơn hàng #O1001 của bạn đang trên đường giao đến địa chỉ của bạn',
-      time: '2 giờ trước',
-      read: false,
-      icon: FiTruck,
-      color: '#2196f3'
-    },
-    {
-      id: 2,
-      type: 'promotion',
-      title: 'Giảm giá đặc biệt',
-      message: 'Flash Sale cuối tuần - Giảm đến 30% cho các dòng laptop gaming',
-      time: '5 giờ trước',
-      read: false,
-      icon: FiTag,
-      color: '#ff9800'
-    },
-    {
-      id: 3,
-      type: 'order',
-      title: 'Đơn hàng đã giao thành công',
-      message: 'Đơn hàng #O1000 đã được giao thành công. Cảm ơn bạn đã mua hàng!',
-      time: '1 ngày trước',
-      read: true,
-      icon: FiCheck,
-      color: '#4caf50'
-    },
-    {
-      id: 4,
-      type: 'product',
-      title: 'Sản phẩm đã về hàng',
-      message: 'ASUS ROG Strix G16 bạn đang quan tâm đã có hàng trở lại',
-      time: '2 ngày trước',
-      read: true,
-      icon: FiPackage,
-      color: '#9c27b0'
-    }
-  ])
+const typeMeta = {
+  ORDER: { icon: FiTruck, color: '#2563eb', label: 'Đơn hàng' },
+  PROMOTION: { icon: FiTag, color: '#ea580c', label: 'Khuyến mãi' },
+  PRODUCT: { icon: FiPackage, color: '#7c3aed', label: 'Sản phẩm' },
+  SYSTEM: { icon: FiSettings, color: '#475569', label: 'Hệ thống' },
+  NEWS: { icon: FiBell, color: '#dc2626', label: 'Tin tức' },
+}
 
+const formatRelativeTime = (value) => {
+  if (!value) return 'Vừa xong'
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return 'Vừa xong'
+  const diff = Date.now() - timestamp
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return 'Vừa xong'
+  if (minutes < 60) return `${minutes} phút trước`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} giờ trước`
+  const days = Math.floor(hours / 24)
+  return `${days} ngày trước`
+}
+
+export default function Notifications() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { notifications, unreadCount, loading, error, refreshNotifications, markOneAsRead, markAllAsRead } = useNotifications()
   const [filter, setFilter] = useState('all')
 
-  const markAsRead = (id) => {
-    setNotifications(notifications.map(notif => 
-      notif.id === id ? { ...notif, read: true } : notif
-    ))
+  useEffect(() => {
+    const params = { limit: 50, offset: 0 }
+    if (filter === 'unread') {
+      params.is_read = false
+    } else if (filter !== 'all') {
+      params.type = filter
+    }
+    refreshNotifications(params).catch(() => {})
+  }, [filter, refreshNotifications])
+
+  const filteredNotifications = useMemo(() => notifications, [notifications])
+
+  const handleOpenNotification = async (notification) => {
+    if (!notification.is_read) {
+      try {
+        await markOneAsRead(notification.notification_id)
+      } catch (err) {
+        console.error('Error marking notification as read:', err)
+      }
+    }
+
+    if (notification.link_url) {
+      navigate(notification.link_url)
+    }
   }
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, read: true })))
+  if (!user) {
+    return (
+      <div className="notifications-page">
+        <div className="notifications-container">
+          <div className="no-notifications">
+            <FiBell size={64} />
+            <h3>Vui lòng đăng nhập</h3>
+            <p>Bạn cần đăng nhập để xem thông báo cá nhân.</p>
+          </div>
+        </div>
+      </div>
+    )
   }
-
-  const deleteNotification = (id) => {
-    setNotifications(notifications.filter(notif => notif.id !== id))
-  }
-
-  const filteredNotifications = filter === 'all' 
-    ? notifications 
-    : filter === 'unread' 
-    ? notifications.filter(n => !n.read)
-    : notifications.filter(n => n.type === filter)
-
-  const unreadCount = notifications.filter(n => !n.read).length
 
   return (
     <div className="notifications-page">
@@ -82,7 +85,7 @@ export default function Notifications() {
             </div>
           </div>
           {unreadCount > 0 && (
-            <button className="mark-all-read-btn" onClick={markAllAsRead}>
+            <button className="mark-all-read-btn" onClick={() => markAllAsRead().catch(() => {})}>
               <FiCheck size={18} />
               Đánh dấu tất cả đã đọc
             </button>
@@ -103,27 +106,39 @@ export default function Notifications() {
             Chưa đọc ({unreadCount})
           </button>
           <button 
-            className={`filter-btn ${filter === 'order' ? 'active' : ''}`}
-            onClick={() => setFilter('order')}
+            className={`filter-btn ${filter === 'ORDER' ? 'active' : ''}`}
+            onClick={() => setFilter('ORDER')}
           >
             Đơn hàng
           </button>
           <button 
-            className={`filter-btn ${filter === 'promotion' ? 'active' : ''}`}
-            onClick={() => setFilter('promotion')}
+            className={`filter-btn ${filter === 'PROMOTION' ? 'active' : ''}`}
+            onClick={() => setFilter('PROMOTION')}
           >
             Khuyến mãi
           </button>
           <button 
-            className={`filter-btn ${filter === 'product' ? 'active' : ''}`}
-            onClick={() => setFilter('product')}
+            className={`filter-btn ${filter === 'PRODUCT' ? 'active' : ''}`}
+            onClick={() => setFilter('PRODUCT')}
           >
             Sản phẩm
           </button>
         </div>
 
         <div className="notifications-list">
-          {filteredNotifications.length === 0 ? (
+          {loading ? (
+            <div className="no-notifications">
+              <FiBell size={64} />
+              <h3>Đang tải thông báo</h3>
+              <p>Vui lòng chờ trong giây lát.</p>
+            </div>
+          ) : error ? (
+            <div className="no-notifications">
+              <FiBell size={64} />
+              <h3>Không thể tải thông báo</h3>
+              <p>{error}</p>
+            </div>
+          ) : filteredNotifications.length === 0 ? (
             <div className="no-notifications">
               <FiBell size={64} />
               <h3>Không có thông báo</h3>
@@ -131,46 +146,41 @@ export default function Notifications() {
             </div>
           ) : (
             filteredNotifications.map(notif => {
-              const Icon = notif.icon
+              const meta = typeMeta[notif.type] || typeMeta.SYSTEM
+              const Icon = meta.icon
               return (
                 <div 
-                  key={notif.id} 
-                  className={`notification-item ${!notif.read ? 'unread' : ''}`}
-                  onClick={() => !notif.read && markAsRead(notif.id)}
+                  key={notif.notification_id} 
+                  className={`notification-item ${!notif.is_read ? 'unread' : ''} ${notif.link_url ? 'clickable' : ''}`}
+                  onClick={() => handleOpenNotification(notif)}
                 >
-                  <div className="notification-icon" style={{ backgroundColor: notif.color }}>
+                  <div className="notification-icon" style={{ backgroundColor: meta.color }}>
                     <Icon size={24} />
                   </div>
                   <div className="notification-content">
                     <div className="notification-header-row">
                       <h3>{notif.title}</h3>
-                      <span className="notification-time">{notif.time}</span>
+                      <span className="notification-time">{formatRelativeTime(notif.created_at)}</span>
                     </div>
-                    <p>{notif.message}</p>
+                    <p>{notif.content || 'Không có nội dung chi tiết'}</p>
+                    <div className="notification-meta-row">
+                      <span className="notification-type-chip">{meta.label}</span>
+                      {notif.link_url ? <span className="notification-link-chip">Có liên kết</span> : null}
+                    </div>
                   </div>
                   <div className="notification-actions">
-                    {!notif.read && (
+                    {!notif.is_read && (
                       <button 
                         className="action-btn read-btn"
                         onClick={(e) => {
                           e.stopPropagation()
-                          markAsRead(notif.id)
+                          markOneAsRead(notif.notification_id).catch(() => {})
                         }}
                         title="Đánh dấu đã đọc"
                       >
                         <FiCheck size={18} />
                       </button>
                     )}
-                    <button 
-                      className="action-btn delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        deleteNotification(notif.id)
-                      }}
-                      title="Xóa thông báo"
-                    >
-                      <FiX size={18} />
-                    </button>
                   </div>
                 </div>
               )

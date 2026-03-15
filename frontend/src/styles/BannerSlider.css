@@ -4,7 +4,7 @@
   align-items: center;
   margin: 30px auto;
   width: 100%;
-  max-width: 100%;
+  max-width: 1180px;
   gap: 16px;
 }
 
@@ -12,14 +12,14 @@
   position: relative;
   overflow: hidden;
   border-radius: 12px;
-  flex: 1;
+  flex: none;
   width: 100%;
 }
 
 .slider-track {
   display: flex;
   width: 100%;
-  height: 350px;
+  height: clamp(380px, 42vw, 500px);
 }
 
 .slide-image {
@@ -85,4 +85,16 @@
   border-color: #e30019;
   width: 32px;
   border-radius: 6px;
+}
+
+@media (max-width: 900px) {
+  .banner-container {
+    max-width: 100%;
+    margin: 20px auto;
+    padding: 0 10px;
+  }
+
+  .slider-track {
+    height: clamp(250px, 55vw, 360px);
+  }
 }

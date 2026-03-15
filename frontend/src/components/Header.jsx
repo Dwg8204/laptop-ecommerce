@@ -1,18 +1,24 @@
 import { FiShoppingCart, FiUser, FiSearch, FiList, FiLogOut, FiPackage, FiBell } from 'react-icons/fi'
 import { MdFiberNew } from 'react-icons/md'
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from './AuthModal'
 import '../styles/header.css'
 import { useCart } from '../context/CartContext'
+import { useProducts } from '../context/ProductContext'
+import { useNotifications } from '../context/NotificationContext'
 
 export default function Header() {
   const [showAuth, setShowAuth] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false)
+  const categoryMenuRef = useRef(null)
   const navigate = useNavigate()
   const { user, logout, isAdmin } = useAuth()
   const  {getTotalItems} = useCart()
+  const { products } = useProducts()
+  const { unreadCount } = useNotifications()
   
   const topBarContent = [
     '⚙️ Thu cũ giá ngon - Lên đời tiết kiệm',
@@ -38,127 +44,182 @@ export default function Header() {
     navigate("/")
   }
 
+  const categories = useMemo(() => {
+    const names = products
+      .map((product) => (product.series || '').trim())
+      .filter(Boolean)
+
+    return [...new Set(names)]
+  }, [products])
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!categoryMenuRef.current?.contains(event.target)) {
+        setShowCategoryMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  const handleCategoryClick = (category) => {
+    setShowCategoryMenu(false)
+    navigate(`/?category=${encodeURIComponent(category)}`)
+  }
+
   return (
     <>
-      {/* Top Bar */}
-      <div style={styles.topBar}>
-        <div style={styles.topBarTrack}>
-          <div style={styles.topBarGroup}>
-            {topBarContent.map((text, index) => (
-              <span style={styles.topBarItem} key={`topbar-1-${index}`}>
-                {text}
-                <span style={styles.topBarDivider}>•</span>
-              </span>
-            ))}
-          </div>
-          <div style={styles.topBarGroup} aria-hidden="true">
-            {topBarContent.map((text, index) => (
-              <span style={styles.topBarItem} key={`topbar-2-${index}`}>
-                {text}
-                <span style={styles.topBarDivider}>•</span>
-              </span>
-            ))}
+      <div style={styles.headerShell}>
+        {/* Top Bar */}
+        <div style={styles.topBar}>
+          <div style={styles.topBarTrack}>
+            <div style={styles.topBarGroup}>
+              {topBarContent.map((text, index) => (
+                <span style={styles.topBarItem} key={`topbar-1-${index}`}>
+                  {text}
+                  <span style={styles.topBarDivider}>•</span>
+                </span>
+              ))}
+            </div>
+            <div style={styles.topBarGroup} aria-hidden="true">
+              {topBarContent.map((text, index) => (
+                <span style={styles.topBarItem} key={`topbar-2-${index}`}>
+                  {text}
+                  <span style={styles.topBarDivider}>•</span>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Header */}
-      <header style={styles.header}>
-        <div style={styles.logo} onClick={() => navigate('/')}>LaptopShop</div>
+        {/* Main Header */}
+        <header style={styles.header}>
+          <div style={styles.logo} onClick={() => navigate('/')}>LaptopShop</div>
 
-        <button style={styles.categoryBtn}>
-          <FiList size={24} />
-          Danh mục
-        </button>
-
-        <div style={styles.searchContainer}>
-          <FiSearch style={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Bạn muốn mua gì hôm nay?"
-            style={styles.searchInput}
-          />
-        </div>
-
-        {/* Actions */}
-        <div style={styles.actions}>
-          {/* Cart */}
-          <div style={styles.cartWrapper} onClick={() => navigate('/cart')}>
-            <span>Giỏ hàng</span>
-            <div style={styles.cartIcon}>
-              <FiShoppingCart size={28} />
-              <span style={styles.cartBadge}>{getTotalItems()}</span>
-            </div>
+          <div style={styles.categoryMenuWrap} ref={categoryMenuRef}>
+            <button style={styles.categoryBtn} onClick={() => setShowCategoryMenu((prev) => !prev)}>
+              <FiList size={24} />
+              Danh mục
+            </button>
+            {showCategoryMenu && (
+              <div style={styles.categoryDropdown}>
+                {categories.length === 0 ? (
+                  <button style={styles.categoryItem} type="button" disabled>
+                    Chưa có danh mục
+                  </button>
+                ) : (
+                  categories.map((category) => (
+                    <button
+                      key={category}
+                      style={styles.categoryItem}
+                      type="button"
+                      onClick={() => handleCategoryClick(category)}
+                    >
+                      {category}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
-          {/*News*/}
-           <div style={styles.newsWrapper} onClick={()=> navigate('/news')}>
-            <span>Tin tức</span>
-            <div style={styles.newsIcon}>
-              <MdFiberNew size={28} />
-              <span style={styles.newsBadge}>0</span>
-            </div>
+
+          <div style={styles.searchContainer}>
+            <FiSearch style={styles.searchIcon} />
+            <input
+              type="text"
+              placeholder="Bạn muốn mua gì hôm nay?"
+              style={styles.searchInput}
+            />
           </div>
-            
-          {/*Notification*/}
-          <div style={styles.notificationWrapper} onClick={()=> navigate('/notifications')}>
-            <span>Thông báo</span>
-            <div style={styles.notificationIcon}>
-              <FiBell size={28} />
-              <span style={styles.notificationBadge}>0</span>
+
+          {/* Actions */}
+          <div style={styles.actions}>
+            {/* Cart */}
+            <div style={styles.cartWrapper} onClick={() => navigate('/cart')}>
+              <span>Giỏ hàng</span>
+              <div style={styles.cartIcon}>
+                <FiShoppingCart size={28} />
+                <span style={styles.cartBadge}>{getTotalItems()}</span>
+              </div>
             </div>
-          </div>
-          {/* Login/User Menu */}
-          {user ? (
-            <div style={styles.userMenu}>
-              <button 
-                style={styles.userBtn} 
-                onClick={() => setShowUserMenu(!showUserMenu)}
-              >
-                {user.name}
+            {/*News*/}
+             <div style={styles.newsWrapper} onClick={()=> navigate('/news')}>
+              <span>Tin tức</span>
+              <div style={styles.newsIcon}>
+                <MdFiberNew size={28} />
+                <span style={styles.newsBadge}>0</span>
+              </div>
+            </div>
+              
+            {/*Notification*/}
+            <div style={styles.notificationWrapper} onClick={()=> navigate('/notifications')}>
+              <span>Thông báo</span>
+              <div style={styles.notificationIcon}>
+                <FiBell size={28} />
+                {user && unreadCount > 0 ? <span style={styles.notificationBadge}>{unreadCount}</span> : null}
+              </div>
+            </div>
+            {/* Login/User Menu */}
+            {user ? (
+              <div style={styles.userMenu}>
+                <button 
+                  style={styles.userBtn} 
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                >
+                  {user.name}
+                  <FiUser size={24} />
+                </button>
+                {showUserMenu && (
+                  <div style={styles.userDropdown}>
+                    <div style={styles.userInfo}>
+                      <strong>{user.name}</strong>
+                      <span style={styles.userRole}>{user.role === 'admin' ? 'Quản trị viên' : user.role === 'warehouse' ? 'Nhân viên kho' : user.role === 'sales' ? 'Nhân viên bán hàng' : 'Khách hàng'}</span>
+                    </div>
+                    {isAdmin() && (
+                      <button className="user-dropdown-item" onClick={handleAdminClick}>
+                        Trang quản trị
+                      </button>
+                    )}
+                    {isAdmin() &&( <button className="user-dropdown-item" onClick={handleUserClick}>Trang người dùng</button>)}
+                    <button 
+                      className="user-dropdown-item" 
+                      onClick={() => {
+                        setShowUserMenu(false)
+                        navigate('/order-tracking')
+                      }}
+                    >
+                      <FiPackage size={16} />
+                      Theo dõi đơn hàng
+                    </button>
+                    <button className="user-dropdown-item" onClick={handleLogout}>
+                      <FiLogOut size={16} />
+                      Đăng xuất
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button style={styles.loginBtn} onClick={() => setShowAuth(true)}>
+                Đăng nhập
                 <FiUser size={24} />
               </button>
-              {showUserMenu && (
-                <div style={styles.userDropdown}>
-                  <div style={styles.userInfo}>
-                    <strong>{user.name}</strong>
-                    <span style={styles.userRole}>{user.role === 'admin' ? 'Quản trị viên' : user.role === 'warehouse' ? 'Nhân viên kho' : user.role === 'sales' ? 'Nhân viên bán hàng' : 'Khách hàng'}</span>
-                  </div>
-                  {isAdmin() && (
-                    <button className="user-dropdown-item" onClick={handleAdminClick}>
-                      Trang quản trị
-                    </button>
-                  )}
-                  {isAdmin() &&( <button className="user-dropdown-item" onClick={handleUserClick}>Trang người dùng</button>)}
-                  <button 
-                    className="user-dropdown-item" 
-                    onClick={() => {
-                      setShowUserMenu(false)
-                      navigate('/order-tracking')
-                    }}
-                  >
-                    <FiPackage size={16} />
-                    Theo dõi đơn hàng
-                  </button>
-                  <button className="user-dropdown-item" onClick={handleLogout}>
-                    <FiLogOut size={16} />
-                    Đăng xuất
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <button style={styles.loginBtn} onClick={() => setShowAuth(true)}>
-              Đăng nhập
-              <FiUser size={24} />
-            </button>
-          )}
-        </div>
-      </header>
+            )}
+          </div>
+        </header>
+      </div>
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </>
   )
 }
 const styles = {
+  headerShell: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 1100,
+    boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)'
+  },
+
   topBar: {
     background: 'linear-gradient(90deg, #e34d7b 0%, #d70018 55%, #d70018 100%)',
     color: '#fff',
@@ -220,6 +281,35 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px'
+  },
+
+  categoryMenuWrap: {
+    position: 'relative'
+  },
+
+  categoryDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    left: 0,
+    minWidth: '220px',
+    maxHeight: '340px',
+    overflowY: 'auto',
+    background: '#fff',
+    borderRadius: '10px',
+    boxShadow: '0 10px 28px rgba(0, 0, 0, 0.18)',
+    zIndex: 1300,
+    padding: '8px 0'
+  },
+
+  categoryItem: {
+    width: '100%',
+    border: 'none',
+    background: 'transparent',
+    color: '#0f172a',
+    textAlign: 'left',
+    fontSize: '14px',
+    padding: '10px 14px',
+    cursor: 'pointer'
   },
 
   searchContainer: {

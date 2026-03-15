@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react"
 import { buildApiUrl } from "../config/api"
+import { clearAuthToken, getAuthToken, setAuthToken } from "../lib/authToken"
 
 const AuthContext = createContext()
 
@@ -26,7 +27,7 @@ export function AuthProvider({ children }) {
   // Khôi phục session khi load app
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem("token")
+      const token = getAuthToken()
       const savedUser = localStorage.getItem("user")
       
       if (token && savedUser) {
@@ -35,7 +36,7 @@ export function AuthProvider({ children }) {
           setUser(normalizeUser(userData))
         } catch (error) {
           console.error("Error parsing saved user:", error)
-          localStorage.removeItem("token")
+          clearAuthToken()
           localStorage.removeItem("user")
         }
       }
@@ -63,7 +64,7 @@ export function AuthProvider({ children }) {
 
       // Lưu token và user data
       if (data.data && data.data.token) {
-        localStorage.setItem("token", data.data.token)
+        setAuthToken(data.data.token)
         localStorage.setItem("user", JSON.stringify(data.data.user))
         
         const normalizedUser = normalizeUser(data.data.user)
@@ -93,7 +94,7 @@ export function AuthProvider({ children }) {
       }
 
       if (data.data && data.data.token) {
-        localStorage.setItem("token", data.data.token)
+        setAuthToken(data.data.token)
         localStorage.setItem("user", JSON.stringify(data.data.user))
 
         const normalizedUser = normalizeUser(data.data.user)
@@ -130,7 +131,7 @@ export function AuthProvider({ children }) {
 
       // Lưu token và user data sau khi đăng ký thành công
       if (data.data && data.data.token) {
-        localStorage.setItem("token", data.data.token)
+        setAuthToken(data.data.token)
         localStorage.setItem("user", JSON.stringify(data.data.user))
         
         const normalizedUser = normalizeUser(data.data.user)
@@ -211,7 +212,7 @@ export function AuthProvider({ children }) {
   }
 
   const logout = () => {
-    localStorage.removeItem("token")
+    clearAuthToken()
     localStorage.removeItem("user")
     setUser(null)
   }

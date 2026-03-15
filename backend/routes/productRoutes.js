@@ -281,6 +281,34 @@ router.post('/', handleProductUpload, productController.createProduct);
 
 /**
  * @swagger
+ * /api/products/{productId}/variants:
+ *   post:
+ *     summary: Thêm phiên bản mới vào sản phẩm đã tồn tại
+ *     tags: [Products]
+ *     description: |
+ *       Thêm 1 variant mới cho sản phẩm theo productId.
+ *       - Có thể gửi `multipart/form-data` với field `variant` (JSON string) + `variantImages` (file[])
+ *       - Hoặc gửi JSON body trực tiếp theo schema ProductVariantInput.
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       201:
+ *         description: Tạo phiên bản thành công
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ *       404:
+ *         description: Sản phẩm không tồn tại
+ *       409:
+ *         description: SKU bị trùng
+ */
+router.post('/:productId/variants', uploadProduct.array('variantImages', 5), productController.addVariantToProduct);
+
+/**
+ * @swagger
  * /api/products/{productId}:
  *   put:
  *     summary: Cập nhật sản phẩm

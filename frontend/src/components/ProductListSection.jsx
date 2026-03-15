@@ -4,7 +4,7 @@ import { useProducts } from "../context/ProductContext"
 import { useCart } from "../context/CartContext"
 import { FiShoppingCart } from "react-icons/fi"
 
-export default function ProductListSection({ filters, sortBy }) {
+export default function ProductListSection({ filters, sortBy, selectedCategory = '' }) {
   const navigate = useNavigate()
   const { products, loading } = useProducts()
   const { addToCart } = useCart()
@@ -23,6 +23,8 @@ export default function ProductListSection({ filters, sortBy }) {
 
   // Lọc sản phẩm
   const filteredProducts = products.filter((product) => {
+    if (selectedCategory && product.series !== selectedCategory) return false
+
     // Lọc theo sẵn hàng
     if (filters?.inStock && !product.inStock) return false
     

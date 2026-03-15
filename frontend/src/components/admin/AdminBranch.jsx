@@ -1,11 +1,13 @@
 import { useMemo, useState, useEffect } from "react"
 import { FiEdit, FiPlus, FiRefreshCcw, FiSave, FiTrash2, FiX } from "react-icons/fi"
 import { buildApiUrl } from "../../config/api"
+import { getAuthToken } from "../../lib/authToken"
 
 export default function AdminBrand() {
   const [brands, setBrands] = useState([])
   const [brandName, setBrandName] = useState("")
-  const [logoUrl, setLogoUrl] = useState("")
+  const [logoFile, setLogoFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState("")
   const [editId, setEditId] = useState(null)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -19,7 +21,7 @@ export default function AdminBrand() {
       withLogo: brands.filter((brand) => Boolean(brand.logo_url)).length,
       withoutLogo: brands.filter((brand) => !brand.logo_url).length,
     }
-  }, [brands])
+  }, [brands])  
 
   useEffect(() => {
     fetchBrands()
@@ -46,7 +48,8 @@ export default function AdminBrand() {
 
   const resetForm = () => {
     setBrandName("")
-    setLogoUrl("")
+    setLogoFile(null)
+    setLogoPreview("")
     setEditId(null)
   }
 
@@ -55,17 +58,22 @@ export default function AdminBrand() {
 
     try {
       setSubmitting(true)
-      const payload = {
-        brand_name: brandName.trim(),
-        logo_url: logoUrl || undefined,
+      const formData = new FormData()
+      formData.append("brand_name", brandName.trim())
+      if (logoFile) {
+        formData.append("logo", logoFile)
+      }
+
+      const token = getAuthToken()
+      const headers = {}
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
       }
 
       const response = await fetch(editId ? `${API_BASE}/${editId}` : API_BASE, {
         method: editId ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers,
+        body: formData,
       })
 
       const data = await response.json()
@@ -86,15 +94,23 @@ export default function AdminBrand() {
 
   const handleEdit = (brand) => {
     setBrandName(brand.brand_name || "")
-    setLogoUrl(brand.logo_url || "")
+    setLogoFile(null)
+    setLogoPreview(brand.logo_url || "")
     setEditId(brand.brand_id)
   }
 
   const handleDelete = async (id) => {
     if (window.confirm("Bạn có chắc muốn xóa?")) {
       try {
+        const token = getAuthToken()
+        const headers = {}
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+        }
+
         const response = await fetch(`${API_BASE}/${id}`, {
           method: "DELETE",
+          headers,
         })
 
         const data = await response.json()
@@ -131,18 +147,21 @@ export default function AdminBrand() {
           </div>
 
           <div className="adm-form-row adm-span2">
-            <label>Logo URL</label>
+            <label>Logo thương hiệu (upload ảnh)</label>
             <input
-              type="url"
-              placeholder="https://example.com/logo.png"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null
+                setLogoFile(file)
+                setLogoPreview(file ? URL.createObjectURL(file) : "")
+              }}
             />
           </div>
 
-          {logoUrl ? (
+          {logoPreview ? (
             <div className="adm-branch-logo-preview adm-span2">
-              <img src={logoUrl} alt="Logo preview" onError={(e) => { e.currentTarget.style.display = "none" }} />
+              <img src={logoPreview} alt="Logo preview" onError={(e) => { e.currentTarget.style.display = "none" }} />
               <span>Xem trước logo</span>
             </div>
           ) : null}

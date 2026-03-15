@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const brandController = require('../controllers/brandController');
+const uploadBrandLogo = require('../middlewares/uploadBrandLogoMiddleware');
 
 /**
  * @swagger
@@ -118,7 +119,7 @@ router.get('/:id', brandController.getBrandById);
  *         description: Lỗi máy chủ nội bộ
  */
 // POST tạo mới thương hiệu
-router.post('/', brandController.createBrand);
+router.post('/', uploadBrandLogo.single('logo'), brandController.createBrand);
 
 /**
  * @swagger
@@ -160,7 +161,7 @@ router.post('/', brandController.createBrand);
  *         description: Lỗi máy chủ nội bộ
  */
 // PUT cập nhật thương hiệu theo ID
-router.put('/:id', brandController.updateBrand);
+router.put('/:id', uploadBrandLogo.single('logo'), brandController.updateBrand);
 
 /**
  * @swagger
