@@ -18,15 +18,37 @@
 }
 
 .brand-item {
-  padding: 10px 20px;
+  width: 110px;          /* cố định ngang */
+  height: 54px;          /* cố định dọc */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
   border: 1px solid #ddd;
   border-radius: 10px;
   background: #fff;
   cursor: pointer;
   transition: 0.2s;
-  font-weight: 500;
+  overflow: hidden;
 }
 
+.brand-logo {
+  width: 90px;           /* tất cả logo cùng khung hiển thị */
+  height: 32px;
+  object-fit: contain;   /* giữ tỉ lệ, không méo */
+  display: block;
+}
+
+.brand-fallback {
+  width: 90px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
 .brand-item:hover {
   border-color: #e30019;
   color: #e30019;

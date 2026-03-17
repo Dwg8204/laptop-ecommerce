@@ -2,8 +2,18 @@ const db = require('../config/db');
 
 const Slider = {
     // Hàm lấy tất cả banner, sắp xếp theo thứ tự hiển thị
-    getAll: async () => {
+    getAllVisible: async () => {
         const query = 'SELECT * FROM slider_banners WHERE status = "VISIBLE" ORDER BY display_order ASC';
+        const [rows] = await db.query(query);
+        return rows;
+    },
+    // Admin: lấy tất cả (VISIBLE + HIDDEN)
+    getAllForAdmin: async () => {
+        const query = `
+            SELECT slider_id, creator_id, title, image_url, link_url, display_order, status
+            FROM slider_banners
+            ORDER BY display_order ASC, slider_id DESC
+        `;
         const [rows] = await db.query(query);
         return rows;
     },

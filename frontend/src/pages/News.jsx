@@ -105,13 +105,13 @@ export default function News() {
       <div className="news-container">
         {!id ? (
           <>
-           <button className="back-btn" onClick={handleGoBack}>
+           {/* <button className="back-btn" onClick={handleGoBack}>
               ← Quay lại
-            </button>
-            <div className="news-header">
+            </button> */}
+            {/* <div className="news-header">
               <h1>Tin Tức & Công Nghệ</h1>
               <p>Cập nhật thông tin mới nhất về laptop, công nghệ và xu hướng thị trường</p>
-            </div>
+            </div> */}
 
             {/* Category filters */}
             {categories.length > 0 && (

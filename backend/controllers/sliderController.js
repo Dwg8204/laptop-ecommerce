@@ -17,7 +17,7 @@ const sliderController = {
     // API Lấy danh sách Slider (GET)
     getAllSliders: async (req, res) => {
         try {
-            const sliders = await Slider.getAll();
+            const sliders = await Slider.getAllVisible();
             res.status(200).json({ 
                 success: true, 
                 message: 'Lấy dữ liệu thành công',
@@ -26,6 +26,20 @@ const sliderController = {
         } catch (error) {
             console.error(error);
             res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
+        }
+    },
+    // Admin
+    getAllSlidersForAdmin: async (req, res) => {
+        try {
+            const sliders = await Slider.getAllForAdmin();
+            return res.status(200).json({
+                success: true,
+                message: 'Lấy dữ liệu admin thành công',
+                data: sliders
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ success: false, message: 'Lỗi máy chủ nội bộ' });
         }
     },
 
