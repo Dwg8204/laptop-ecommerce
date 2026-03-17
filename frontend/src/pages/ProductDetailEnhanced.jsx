@@ -304,7 +304,7 @@ export default function ProductDetail() {
 
   const breadcrumbItems = [
     { label: "Trang chủ", path: "/" },
-    { label: "Laptop", path: "/" },
+    // { label: "Laptop", path: "/" },
     { label: product?.brand_name || "Sản phẩm", path: "/" },
     { label: product?.product_name || "Chi tiết" },
   ]

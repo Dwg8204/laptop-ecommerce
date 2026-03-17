@@ -211,11 +211,26 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const logout = () => {
+  const logout = async () => {
+  try {
+    const token = getAuthToken()
+    if (token) {
+      await fetch(buildApiUrl("/api/auth/logout"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      })
+    }
+  } catch (error) {
+    // ignore network/logout API errors
+  } finally {
     clearAuthToken()
     localStorage.removeItem("user")
     setUser(null)
   }
+}
 
   // Hàm kiểm tra quyền admin
   const isAdmin = () => {

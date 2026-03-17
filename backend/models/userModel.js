@@ -24,9 +24,9 @@ const User = {
     // Tìm user theo ID
     findById: async (userId) => {
         const [rows] = await pool.execute(
-            'SELECT user_id, email, full_name, phone_number, status, created_at FROM users WHERE user_id = ?',
-            [userId]
-        );
+        'SELECT user_id, email, full_name, phone_number, status, token_version, created_at FROM users WHERE user_id = ?',
+        [userId]
+    );
         return rows[0];
     },
 

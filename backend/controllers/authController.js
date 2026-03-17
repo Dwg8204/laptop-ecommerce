@@ -5,12 +5,12 @@ const User = require('../models/userModel');
 const PasswordReset = require('../models/passwordResetModel');
 const { sendEmail } = require('../utils/mailer');
 require('dotenv').config();
-
+const db = require('../config/db');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const createAuthToken = (userId, email) => jwt.sign(
-    { user_id: userId, email },
+const createAuthToken = (userId, email, tokenVersion = 1) => jwt.sign(
+    { user_id: userId, email, token_version: tokenVersion },
     process.env.JWT_SECRET || 'your-secret-key',
     { expiresIn: '7d' }
 );
@@ -132,12 +132,13 @@ const authController = {
 
             // 6. Tạo JWT token
             console.log('🔑 Creating JWT token...');
-            const token = createAuthToken(userId, normalizedEmail);
+const token = createAuthToken(userId, normalizedEmail, newUser.token_version || 1);
             console.log('✅ Token created');
 
             // 7. Lấy thông tin user vừa tạo
             console.log('📋 Fetching user info...');
             const newUser = await User.findById(userId);
+            
             if (!newUser) {
                 console.error('❌ User not found after creation');
                 return res.status(500).json({
@@ -207,7 +208,7 @@ const authController = {
             }
 
             // 5. Tạo JWT token
-            const token = createAuthToken(user.user_id, user.email);
+const token = createAuthToken(user.user_id, user.email, user.token_version || 1);
             const safeUser = await getUserWithRoles(user);
 
             res.status(200).json({
@@ -224,6 +225,24 @@ const authController = {
                 success: false,
                 message: 'Lỗi khi đăng nhập'
             });
+        }
+    },
+
+    logout: async (req, res) => {
+        try {
+            const userId = req.user?.user_id;
+            if (!userId) {
+                return res.status(401).json({ success: false, message: 'Chưa xác thực người dùng' });
+            }
+
+            await db.query(
+                'UPDATE users SET token_version = token_version + 1 WHERE user_id = ?',
+                [userId]
+            );
+
+            return res.status(200).json({ success: true, message: 'Đăng xuất thành công' });
+        } catch (error) {
+            return res.status(500).json({ success: false, message: 'Lỗi server khi đăng xuất' });
         }
     },
 
@@ -289,7 +308,7 @@ const authController = {
                 });
             }
 
-            const token = createAuthToken(user.user_id, user.email);
+const token = createAuthToken(user.user_id, user.email, user.token_version || 1);
             const safeUser = await getUserWithRoles(user);
 
             return res.status(200).json({
@@ -360,6 +379,7 @@ const authController = {
         }
     },
 
+    
     // API xác thực mã reset password
     verifyResetCode: async (req, res) => {
         try {

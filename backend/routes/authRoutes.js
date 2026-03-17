@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const { verifyToken } = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
@@ -305,5 +306,5 @@ router.post('/verify-reset-code', authController.verifyResetCode);
  *         description: Loi may chu
  */
 router.post('/reset-password', authController.resetPassword);
-
+router.post('/logout', verifyToken, authController.logout);
 module.exports = router;

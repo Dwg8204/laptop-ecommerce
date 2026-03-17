@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiImage, FiLink2, FiEye } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiImage, FiLink2, FiEye, FiEyeOff } from 'react-icons/fi';
 import { buildApiUrl } from '../../config/api';
 import '../../styles/AdminSlider.css';
+import { getAuthToken } from '../../lib/authToken';
+
+
+
 
 const resolveImageUrl = (url) => {
   const raw = String(url || '').trim();
@@ -33,10 +37,16 @@ export default function AdminSliderAPI() {
     loadSliders();
   }, []);
 
+const authHeaders = () => {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
   const loadSliders = async () => {
     try {
       setLoading(true);
-      const res = await fetch(buildApiUrl('/api/sliders'));
+      const res = await fetch(buildApiUrl('/api/sliders/admin/all'), {
+        headers: authHeaders()
+      });
       const data = await res.json();
       setSliders(Array.isArray(data?.data) ? data.data : []);
       setError('');
@@ -68,6 +78,52 @@ export default function AdminSliderAPI() {
         setImagePreview(event.target.result);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleToggleVisibility = async (slider) => {
+    const isVisible = String(slider.status || '').toUpperCase() === 'VISIBLE';
+    const nextStatus = isVisible ? 'HIDDEN' : 'VISIBLE';
+    const confirmMsg = isVisible
+      ? 'Bạn có muốn ẩn slider này không? (Slider vẫn hiển thị trong trang admin)'
+      : 'Bạn có muốn bật hiển thị slider này không?';
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const form = new FormData();
+      form.append('title', slider.title || '');
+      form.append('link_url', slider.link_url || '');
+      form.append('display_order', slider.display_order ?? 0);
+      form.append('status', nextStatus);
+
+      const res = await fetch(buildApiUrl(`/api/sliders/${slider.slider_id}`), {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: form
+      });
+
+      const raw = await res.text();
+      let data;
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error('Server trả về dữ liệu không hợp lệ (không phải JSON).');
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || 'Không thể cập nhật trạng thái slider');
+      }
+
+      alert(
+        nextStatus === 'HIDDEN'
+          ? 'Đã ẩn slider trên trang chủ'
+          : 'Đã bật hiển thị slider trên trang chủ'
+      );
+      await loadSliders();
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi: ' + err.message);
     }
   };
 
@@ -189,6 +245,7 @@ export default function AdminSliderAPI() {
       
       const res = await fetch(url, {
         method,
+        headers: authHeaders(),
         body: form
       });
 
@@ -218,7 +275,8 @@ export default function AdminSliderAPI() {
 
     try {
       const res = await fetch(buildApiUrl(`/api/sliders/${id}`), {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: authHeaders()
       });
 
       const raw = await res.text();
@@ -478,6 +536,15 @@ export default function AdminSliderAPI() {
               </div>
 
               <div className="card-footer">
+                <button 
+                  className={`btn btn-sm ${slider.status === 'VISIBLE' ? 'btn-secondary' : 'btn-success'}`}
+                  onClick={() => handleToggleVisibility(slider)}
+                  disabled={showForm}
+                  title={slider.status === 'VISIBLE' ? 'Ẩn slider' : 'Hiển thị slider'}
+                >
+                  {slider.status === 'VISIBLE' ? <FiEyeOff /> : <FiEye />}
+                  {slider.status === 'VISIBLE' ? 'Ẩn' : 'Hiện'}
+                </button>
                 <button 
                   className="btn btn-warning btn-sm"
                   onClick={() => handleEdit(slider)}
