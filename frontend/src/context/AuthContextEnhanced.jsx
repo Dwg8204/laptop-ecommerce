@@ -1,74 +1,101 @@
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useRef } from "react"
 import { buildApiUrl } from "../config/api"
 import { clearAuthToken, getAuthToken, setAuthToken } from "../lib/authToken"
 
 const AuthContext = createContext()
 
-export function AuthProvider({ children }) {
+export function AuthProvider({ children, onAuthChange }) {
+  // onAuthChange là prop tùy chọn — được truyền từ file gốc nơi AuthProvider
+  // và CartProvider được khai báo (thường là App.jsx hoặc main.jsx).
+  // Xem hướng dẫn tích hợp ở cuối file.
+
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Normalize user data từ backend
+  // Giữ ref để dùng trong các hàm async mà không cần re-render
+  const onAuthChangeRef = useRef(onAuthChange)
+  useEffect(() => {
+    onAuthChangeRef.current = onAuthChange
+  }, [onAuthChange])
+
+  // ── Normalize user ──────────────────────────────────────────────────────────
   const normalizeUser = (userData) => {
     if (!userData) return null
-    
-    // Lấy role đầu tiên từ roles array
-    const primaryRole = userData.roles && userData.roles.length > 0 
-      ? userData.roles[0].role_name.toLowerCase() 
-      : 'customer'
-    
+    const primaryRole =
+      userData.roles && userData.roles.length > 0
+        ? userData.roles[0].role_name.toLowerCase()
+        : "customer"
     return {
       ...userData,
-      name: userData.full_name || userData.name, // Map full_name thành name
-      role: primaryRole // Map roles array thành role string đơn
+      name: userData.full_name || userData.name,
+      role: primaryRole,
     }
   }
 
-  // Khôi phục session khi load app
+  // ── Helper: set user + thông báo CartContext ────────────────────────────────
+  const applyUser = async (userData) => {
+    const normalized = normalizeUser(userData)
+    setUser(normalized)
+    // Gọi callback nếu có — CartContext sẽ merge + fetch cart
+    if (onAuthChangeRef.current) {
+      await onAuthChangeRef.current(normalized)
+    }
+    return normalized
+  }
+
+  // ── Khôi phục session khi load app ─────────────────────────────────────────
+  // THAY ĐỔI: Gọi onAuthChange sau khi restore để CartContext fetch cart
+  // đúng theo user (thay vì chỉ dùng session_id của khách)
   useEffect(() => {
     const initAuth = async () => {
       const token = getAuthToken()
       const savedUser = localStorage.getItem("user")
-      
+
       if (token && savedUser) {
         try {
           const userData = JSON.parse(savedUser)
-          setUser(normalizeUser(userData))
+          // Dùng applyUser thay vì setUser trực tiếp
+          await applyUser(userData)
         } catch (error) {
           console.error("Error parsing saved user:", error)
           clearAuthToken()
           localStorage.removeItem("user")
+          // Thông báo CartContext user = null để fetch cart theo session
+          if (onAuthChangeRef.current) {
+            await onAuthChangeRef.current(null)
+          }
+        }
+      } else {
+        // Không có session — thông báo CartContext fetch cart theo session_id
+        if (onAuthChangeRef.current) {
+          await onAuthChangeRef.current(null)
         }
       }
       setLoading(false)
     }
-    
+
     initAuth()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── login ───────────────────────────────────────────────────────────────────
+  // THAY ĐỔI: Gọi applyUser thay vì setUser trực tiếp
   const login = async (email, password) => {
     try {
       const res = await fetch(buildApiUrl("/api/auth/login"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email, password })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       })
 
       const data = await res.json()
+      if (!res.ok) return { success: false, error: data.message }
 
-      if (!res.ok) {
-        return { success: false, error: data.message }
-      }
-
-      // Lưu token và user data
-      if (data.data && data.data.token) {
+      if (data.data?.token) {
         setAuthToken(data.data.token)
         localStorage.setItem("user", JSON.stringify(data.data.user))
-        
-        const normalizedUser = normalizeUser(data.data.user)
-        setUser(normalizedUser)
+        // applyUser sẽ: setUser + gọi onAuthChange → CartContext merge + fetch
+        await applyUser(data.data.user)
       }
 
       return { success: true, data: data.data }
@@ -78,27 +105,23 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // ── loginWithFacebook ───────────────────────────────────────────────────────
+  // THAY ĐỔI: Gọi applyUser thay vì setUser trực tiếp
   const loginWithFacebook = async (accessToken) => {
     try {
       const res = await fetch(buildApiUrl("/api/auth/facebook"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ accessToken })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken }),
       })
 
       const data = await res.json()
-      if (!res.ok) {
-        return { success: false, error: data.message }
-      }
+      if (!res.ok) return { success: false, error: data.message }
 
-      if (data.data && data.data.token) {
+      if (data.data?.token) {
         setAuthToken(data.data.token)
         localStorage.setItem("user", JSON.stringify(data.data.user))
-
-        const normalizedUser = normalizeUser(data.data.user)
-        setUser(normalizedUser)
+        await applyUser(data.data.user)
       }
 
       return { success: true, data: data.data }
@@ -108,34 +131,28 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // ── register ────────────────────────────────────────────────────────────────
+  // THAY ĐỔI: Gọi applyUser thay vì setUser trực tiếp
   const register = async (name, email, password, phone) => {
     try {
       const res = await fetch(buildApiUrl("/api/auth/register"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           full_name: name,
           email,
           password,
-          phone_number: phone
-        })
+          phone_number: phone,
+        }),
       })
 
       const data = await res.json()
+      if (!res.ok) return { success: false, error: data.message }
 
-      if (!res.ok) {
-        return { success: false, error: data.message }
-      }
-
-      // Lưu token và user data sau khi đăng ký thành công
-      if (data.data && data.data.token) {
+      if (data.data?.token) {
         setAuthToken(data.data.token)
         localStorage.setItem("user", JSON.stringify(data.data.user))
-        
-        const normalizedUser = normalizeUser(data.data.user)
-        setUser(normalizedUser)
+        await applyUser(data.data.user)
       }
 
       return { success: true, data: data.data }
@@ -145,21 +162,45 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // ── logout ──────────────────────────────────────────────────────────────────
+  // THAY ĐỔI: Gọi onAuthChange(null) trong finally để CartContext reset về cart
+  // của session khách ngay cả khi API logout thất bại
+  const logout = async () => {
+    try {
+      const token = getAuthToken()
+      if (token) {
+        await fetch(buildApiUrl("/api/auth/logout"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        })
+      }
+    } catch (error) {
+      // ignore network/logout API errors
+    } finally {
+      clearAuthToken()
+      localStorage.removeItem("user")
+      setUser(null)
+      // Thông báo CartContext: user = null → fetch cart theo session_id mới
+      if (onAuthChangeRef.current) {
+        await onAuthChangeRef.current(null)
+      }
+    }
+  }
+
+  // ── forgotPassword, verifyResetCode, resetPassword ─────────────────────────
+  // Không thay đổi — các hàm này không liên quan đến cart
   const forgotPassword = async (email) => {
     try {
       const res = await fetch(buildApiUrl("/api/auth/forgot-password"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
       })
-
       const data = await res.json()
-      if (!res.ok) {
-        return { success: false, error: data.message }
-      }
-
+      if (!res.ok) return { success: false, error: data.message }
       return { success: true, message: data.message }
     } catch (error) {
       console.error("Forgot password error:", error)
@@ -171,17 +212,11 @@ export function AuthProvider({ children }) {
     try {
       const res = await fetch(buildApiUrl("/api/auth/verify-reset-code"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email, code })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
       })
-
       const data = await res.json()
-      if (!res.ok) {
-        return { success: false, error: data.message }
-      }
-
+      if (!res.ok) return { success: false, error: data.message }
       return { success: true, message: data.message }
     } catch (error) {
       console.error("Verify reset code error:", error)
@@ -193,17 +228,11 @@ export function AuthProvider({ children }) {
     try {
       const res = await fetch(buildApiUrl("/api/auth/reset-password"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email, code, newPassword })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code, newPassword }),
       })
-
       const data = await res.json()
-      if (!res.ok) {
-        return { success: false, error: data.message }
-      }
-
+      if (!res.ok) return { success: false, error: data.message }
       return { success: true, message: data.message }
     } catch (error) {
       console.error("Reset password error:", error)
@@ -211,38 +240,63 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const logout = async () => {
-  try {
-    const token = getAuthToken()
-    if (token) {
-      await fetch(buildApiUrl("/api/auth/logout"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        }
-      })
-    }
-  } catch (error) {
-    // ignore network/logout API errors
-  } finally {
-    clearAuthToken()
-    localStorage.removeItem("user")
-    setUser(null)
-  }
-}
-
-  // Hàm kiểm tra quyền admin
   const isAdmin = () => {
     if (!user) return false
-    return user.role === 'admin' || user.role === 'staff'
+    return user.role === "admin" || user.role === "staff"
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginWithFacebook, register, forgotPassword, verifyResetCode, resetPassword, logout, isAdmin }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        loginWithFacebook,
+        register,
+        forgotPassword,
+        verifyResetCode,
+        resetPassword,
+        logout,
+        isAdmin,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
 }
 
 export const useAuth = () => useContext(AuthContext)
+
+// ─── HƯỚNG DẪN TÍCH HỢP ─────────────────────────────────────────────────────
+//
+// Vì AuthProvider cần gọi onAuthChange từ CartContext, nhưng hai context
+// không thể import lẫn nhau, dùng pattern "bridge" ở App.jsx hoặc main.jsx:
+//
+//   import { CartProvider, useCart } from './context/CartContext'
+//   import { AuthProvider } from './context/AuthContext'
+//
+//   function AppProviders({ children }) {
+//     // CartProvider bao ngoài để tồn tại trước
+//     return (
+//       <CartProvider>
+//         <AuthBridge>{children}</AuthBridge>
+//       </CartProvider>
+//     )
+//   }
+//
+//   // Component trung gian: lấy onAuthChange từ CartContext rồi truyền vào AuthProvider
+//   function AuthBridge({ children }) {
+//     const { onAuthChange } = useCart()
+//     return (
+//       <AuthProvider onAuthChange={onAuthChange}>
+//         {children}
+//       </AuthProvider>
+//     )
+//   }
+//
+//   // Sau đó trong App hoặc main.jsx:
+//   <AppProviders>
+//     <RouterProvider router={router} />  {/* hoặc <App /> */}
+//   </AppProviders>
+//
+// ─────────────────────────────────────────────────────────────────────────────
