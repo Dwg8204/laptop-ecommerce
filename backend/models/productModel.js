@@ -139,6 +139,52 @@ const Product = {
         return rows;
     },
 
+    getSearchSuggestions: async (keyword, productLimit = 5, categoryLimit = 5) => {
+        const like = `%${String(keyword || '').trim()}%`;
+
+        const categoriesQuery = `
+            SELECT
+                c.category_id,
+                c.category_name,
+                COUNT(p.product_id) AS product_count
+            FROM categories c
+            LEFT JOIN products p ON p.category_id = c.category_id
+            WHERE c.category_name LIKE ?
+            GROUP BY c.category_id, c.category_name
+            ORDER BY product_count DESC, c.category_name ASC
+            LIMIT ?
+        `;
+
+        const productsQuery = `
+            SELECT
+                p.product_id,
+                p.product_name,
+                c.category_id,
+                c.category_name,
+                MIN(CASE WHEN pv.discount_price IS NOT NULL THEN pv.discount_price ELSE pv.original_price END) AS current_price,
+                MIN(pv.original_price) AS original_price,
+                (
+                    SELECT pi.image_url
+                    FROM product_images pi
+                    WHERE pi.product_id = p.product_id
+                    ORDER BY pi.is_primary DESC, pi.image_id ASC
+                    LIMIT 1
+                ) AS image_url
+            FROM products p
+            LEFT JOIN categories c ON c.category_id = p.category_id
+            LEFT JOIN product_variants pv ON pv.product_id = p.product_id
+            WHERE p.product_name LIKE ?
+            GROUP BY p.product_id, p.product_name, c.category_id, c.category_name
+            ORDER BY p.created_at DESC
+            LIMIT ?
+        `;
+
+        const [categories] = await db.query(categoriesQuery, [like, Number(categoryLimit) || 5]);
+        const [products] = await db.query(productsQuery, [like, Number(productLimit) || 5]);
+
+        return { categories, products };
+    },
+
     /**
      * Lấy tổng số lượng sản phẩm dựa trên các bộ lọc (dùng cho phân trang).
      * @param {Object} options - Các tùy chọn lọc.

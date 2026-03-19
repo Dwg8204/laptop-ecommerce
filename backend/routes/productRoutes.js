@@ -172,6 +172,8 @@ const handleProductUpload = (req, res, next) => {
 // GET tất cả sản phẩm (có thể kèm theo lọc, tìm kiếm, sắp xếp, phân trang)
 router.get('/', productController.getAllProducts);
 
+router.get('/search/suggest', productController.getSearchSuggestions);
+
 /**
  * @swagger
  * /api/products/{productId}:

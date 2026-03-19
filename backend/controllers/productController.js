@@ -66,6 +66,36 @@ const productController = {
         }
     },
 
+    getSearchSuggestions: async (req, res) => {
+        try {
+            const q = String(req.query.q || '').trim();
+            const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 5, 1), 10);
+            const categoryLimit = Math.min(Math.max(parseInt(req.query.categoryLimit, 10) || 5, 1), 10);
+
+            if (!q) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'OK',
+                    data: { categories: [], products: [] }
+                });
+            }
+
+            const data = await Product.getSearchSuggestions(q, limit, categoryLimit);
+
+            return res.status(200).json({
+                success: true,
+                message: 'Lấy gợi ý tìm kiếm thành công',
+                data
+            });
+        } catch (error) {
+            console.error('Error getSearchSuggestions:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Lỗi server khi lấy gợi ý tìm kiếm'
+            });
+        }
+    },
+
     // API: Lấy chi tiết sản phẩm theo ID (GET /api/products/:id)
     getProductById: async (req, res) => {
         try {

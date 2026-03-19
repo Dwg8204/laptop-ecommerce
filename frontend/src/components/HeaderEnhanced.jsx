@@ -9,6 +9,7 @@ import { useCart } from '../context/CartContext'
 import { useProducts } from '../context/ProductContext'
 import { useNotifications } from '../context/NotificationContext'
 import { buildApiUrl } from "../config/api"
+import SearchSuggestBox from "./SearchSuggestBox";
 
 export default function Header() {
   const [showAuth, setShowAuth] = useState(false)
@@ -138,13 +139,16 @@ export default function Header() {
       )}
           </div>
 
-          <div style={styles.searchContainer}>
+          {/* <div style={styles.searchContainer}>
             <FiSearch style={styles.searchIcon} />
             <input
               type="text"
               placeholder="Bạn muốn mua gì hôm nay?"
               style={styles.searchInput}
             />
+          </div> */}
+          <div className="header-search-area">
+            <SearchSuggestBox />
           </div>
 
           {/* Actions */}
