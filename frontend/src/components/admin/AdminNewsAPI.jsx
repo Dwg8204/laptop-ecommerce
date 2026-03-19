@@ -1,24 +1,57 @@
 import React, { useEffect, useState } from "react"
 import axios from "axios"
-import { 
-  FiPlus, 
-  FiEdit2, 
-  FiTrash2, 
-  FiEye, 
-  FiEyeOff, 
-  FiSave, 
-  FiX, 
+import {
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiEye,
+  FiEyeOff,
+  FiSave,
+  FiX,
   FiImage,
   FiTag,
   FiSearch,
   FiCheckCircle,
   FiClock,
-  FiAlertCircle
+  FiAlertCircle,
+  FiUpload
 } from "react-icons/fi"
+import { EditorContent, useEditor } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
+import Underline from "@tiptap/extension-underline"
+import Link from "@tiptap/extension-link"
+import Image from "@tiptap/extension-image"
+import Placeholder from "@tiptap/extension-placeholder"
+import TextAlign from "@tiptap/extension-text-align"
+import { Node } from "@tiptap/core"
+import Youtube from "@tiptap/extension-youtube"
+
 import "../../styles/AdminNews.css"
 import { BLOG_API_BASE } from "../../config/api"
+import { getAuthToken } from "../../lib/authToken"
 
 const API_BASE = BLOG_API_BASE
+
+const Video = Node.create({
+  name: "video",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+      controls: { default: true },
+      width: { default: "100%" }
+    }
+  },
+  parseHTML() {
+    return [{ tag: "video" }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["video", HTMLAttributes]
+  }
+})
 
 const statusLabel = (status) => {
   if (status === "DRAFT") return "Nháp"
@@ -46,12 +79,20 @@ const excerpt = (html, max = 140) => {
   return text.length > max ? `${text.slice(0, max).trim()}...` : text
 }
 
+const authHeaders = () => {
+  const token = getAuthToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 function AdminNewsAPI() {
   // ===== STATE =====
   const [categories, setCategories] = useState([])
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  const [thumbnailUploading, setThumbnailUploading] = useState(false)
+  const [editorUploading, setEditorUploading] = useState(false)
 
   // ===== FILTERS =====
   const [searchQuery, setSearchQuery] = useState("")
@@ -76,6 +117,46 @@ function AdminNewsAPI() {
     status: "DRAFT"
   })
 
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Underline,
+      Link.configure({
+        openOnClick: false,
+        autolink: true
+      }),
+      Image.configure({
+        allowBase64: true
+      }),
+      TextAlign.configure({
+        types: ["heading", "paragraph"]
+      }),
+      Placeholder.configure({
+        placeholder: "Soạn nội dung bài viết..."
+      }),
+      Video,
+      Youtube.configure({
+      controls: true,
+      nocookie: true,
+      width: 640,
+      height: 360,
+      allowFullscreen: true
+    })
+    ],
+    content: postForm.content_html || "",
+    onUpdate({ editor: currentEditor }) {
+      setPostForm((prev) => ({ ...prev, content_html: currentEditor.getHTML() }))
+    }
+  })
+
+  useEffect(() => {
+    if (!editor) return
+    const html = postForm.content_html || ""
+    if (editor.getHTML() !== html) {
+      editor.commands.setContent(html, false)
+    }
+  }, [editor, postForm.content_html])
+
   // ===== LOAD DATA =====
   useEffect(() => {
     loadCategories()
@@ -95,17 +176,111 @@ function AdminNewsAPI() {
   const loadPosts = async () => {
     try {
       setLoading(true)
-      // Load all posts (admin view, includes all statuses)
-      const response = await axios.get(`${API_BASE}/posts/all`)
+      const response = await axios.get(`${API_BASE}/posts/all`, {
+        headers: authHeaders()
+      })
       setPosts(response.data?.data || [])
       setError("")
     } catch (err) {
       console.error("❌ Lỗi load posts:", err)
-      setError("Không thể tải bài viết")
+      setError(err.response?.data?.message || "Không thể tải bài viết")
     } finally {
       setLoading(false)
     }
   }
+
+  const uploadMediaFile = async (file) => {
+    const form = new FormData()
+    form.append("file", file)
+
+    const response = await axios.post(`${API_BASE}/media/upload`, form, {
+      headers: {
+        ...authHeaders(),
+        "Content-Type": "multipart/form-data"
+      }
+    })
+
+    if (!response.data?.success || !response.data?.data?.url) {
+      throw new Error(response.data?.message || "Upload thất bại")
+    }
+
+    return response.data.data.url
+  }
+
+  const handleThumbnailUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setThumbnailUploading(true)
+      const url = await uploadMediaFile(file)
+      setPostForm((prev) => ({ ...prev, thumbnail_url: url }))
+    } catch (err) {
+      console.error("❌ Lỗi upload thumbnail:", err)
+      alert(err.message || "Không thể upload thumbnail")
+    } finally {
+      setThumbnailUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  const pickFile = (accept) =>
+    new Promise((resolve) => {
+      const input = document.createElement("input")
+      input.type = "file"
+      input.accept = accept
+      input.onchange = () => resolve(input.files?.[0] || null)
+      input.click()
+    })
+
+  const handleInsertImage = async () => {
+    try {
+      const file = await pickFile("image/*")
+      if (!file) return
+      setEditorUploading(true)
+      const url = await uploadMediaFile(file)
+      editor?.chain().focus().setImage({ src: url }).run()
+    } catch (err) {
+      console.error("❌ Lỗi chèn ảnh:", err)
+      alert(err.message || "Không thể chèn ảnh")
+    } finally {
+      setEditorUploading(false)
+    }
+  }
+
+  const handleInsertVideo = async () => {
+    try {
+      const file = await pickFile("video/*")
+      if (!file) return
+      setEditorUploading(true)
+      const url = await uploadMediaFile(file)
+      editor
+        ?.chain()
+        .focus()
+        .insertContent(`<video src="${url}" controls width="100%"></video>`)
+        .run()
+    } catch (err) {
+      console.error("❌ Lỗi chèn video:", err)
+      alert(err.message || "Không thể chèn video")
+    } finally {
+      setEditorUploading(false)
+    }
+  }
+
+  const handleInsertYoutube = () => {
+  const url = window.prompt("Nhập link YouTube:")
+  if (!url || !editor) return
+
+  editor
+    .chain()
+    .focus()
+    .setYoutubeVideo({
+      src: url,
+      width: 640,
+      height: 360
+    })
+    .run()
+}
 
   // ===== CATEGORY ACTIONS =====
   const handleCreateCategory = async (e) => {
@@ -117,10 +292,14 @@ function AdminNewsAPI() {
     }
 
     try {
-      await axios.post(`${API_BASE}/categories`, {
-        category_name: name,
-        description: categoryForm.description.trim()
-      })
+      await axios.post(
+        `${API_BASE}/categories`,
+        {
+          category_name: name,
+          description: categoryForm.description.trim()
+        },
+        { headers: authHeaders() }
+      )
       alert("✅ Đã tạo danh mục")
       setCategoryForm({ category_name: "", description: "" })
       setShowCategoryForm(false)
@@ -135,10 +314,12 @@ function AdminNewsAPI() {
     if (!window.confirm("Bạn có chắc muốn xóa danh mục này?")) return
 
     try {
-      await axios.delete(`${API_BASE}/categories/${categoryId}`)
+      await axios.delete(`${API_BASE}/categories/${categoryId}`, {
+        headers: authHeaders()
+      })
       alert("✅ Đã xóa danh mục")
       loadCategories()
-      loadPosts() // Reload posts in case some were affected
+      loadPosts()
     } catch (err) {
       console.error("❌ Lỗi xóa category:", err)
       alert(err.response?.data?.message || "Không thể xóa danh mục")
@@ -163,6 +344,7 @@ function AdminNewsAPI() {
     })
     setEditingPostId(null)
     setShowPostForm(false)
+    editor?.commands.setContent("", false)
   }
 
   const handleSubmitPost = async (e, statusOverride = null) => {
@@ -175,7 +357,7 @@ function AdminNewsAPI() {
     }
 
     const payload = {
-      category_id: parseInt(postForm.category_id),
+      category_id: parseInt(postForm.category_id, 10),
       title: postForm.title.trim(),
       thumbnail_url: postForm.thumbnail_url.trim(),
       content_html: postForm.content_html,
@@ -184,15 +366,17 @@ function AdminNewsAPI() {
 
     try {
       if (editingPostId) {
-        // Update existing post
-        await axios.put(`${API_BASE}/posts/${editingPostId}`, payload)
+        await axios.put(`${API_BASE}/posts/${editingPostId}`, payload, {
+          headers: authHeaders()
+        })
         alert("✅ Đã cập nhật bài viết")
       } else {
-        // Create new post
-        await axios.post(`${API_BASE}/posts`, payload)
+        await axios.post(`${API_BASE}/posts`, payload, {
+          headers: authHeaders()
+        })
         alert(payload.status === "PUBLISHED" ? "✅ Đã đăng bài" : "✅ Đã lưu nháp")
       }
-      
+
       resetPostForm()
       loadPosts()
     } catch (err) {
@@ -203,14 +387,16 @@ function AdminNewsAPI() {
 
   const handleEditPost = (post) => {
     setEditingPostId(post.post_id)
+    const html = post.content_html || ""
     setPostForm({
       category_id: String(post.category_id || ""),
       title: post.title || "",
       thumbnail_url: post.thumbnail_url || "",
-      content_html: post.content_html || "",
+      content_html: html,
       status: post.status || "DRAFT"
     })
     setShowPostForm(true)
+    editor?.commands.setContent(html, false)
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
@@ -218,7 +404,9 @@ function AdminNewsAPI() {
     if (!window.confirm("Bạn có chắc muốn xóa bài viết này?")) return
 
     try {
-      await axios.delete(`${API_BASE}/posts/${postId}`)
+      await axios.delete(`${API_BASE}/posts/${postId}`, {
+        headers: authHeaders()
+      })
       alert("✅ Đã xóa bài viết")
       loadPosts()
     } catch (err) {
@@ -229,7 +417,11 @@ function AdminNewsAPI() {
 
   const handleChangeStatus = async (postId, newStatus) => {
     try {
-      await axios.patch(`${API_BASE}/posts/${postId}/status`, { status: newStatus })
+      await axios.patch(
+        `${API_BASE}/posts/${postId}/status`,
+        { status: newStatus },
+        { headers: authHeaders() }
+      )
       alert(`✅ Đã chuyển sang: ${statusLabel(newStatus)}`)
       loadPosts()
     } catch (err) {
@@ -239,46 +431,40 @@ function AdminNewsAPI() {
   }
 
   // ===== FILTERED POSTS =====
-  const filteredPosts = posts.filter(post => {
-    // Status filter
+  const filteredPosts = posts.filter((post) => {
     if (statusFilter !== "ALL" && post.status !== statusFilter) return false
-    
-    // Category filter
     if (categoryFilter !== "ALL" && String(post.category_id) !== categoryFilter) return false
-    
-    // Search query
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       const title = (post.title || "").toLowerCase()
       const content = (post.content_html || "").toLowerCase()
       if (!title.includes(query) && !content.includes(query)) return false
     }
-    
+
     return true
   })
 
   // ===== CATEGORY MAP =====
   const categoryMap = {}
-  categories.forEach(cat => {
+  categories.forEach((cat) => {
     categoryMap[cat.category_id] = cat.category_name
   })
 
-  // ===== RENDER =====
   return (
     <div className="admin-news-container">
       <div className="admin-news-header">
         <div>
           <h2>📰 Quản lý Tin tức</h2>
-          <p className="admin-news-subtitle">Sắp xếp nội dung, trạng thái và danh mục trên một màn hình rõ ràng.</p>
+          <p className="admin-news-subtitle">
+            Soạn nội dung kiểu Word với TipTap, hỗ trợ upload ảnh/video vào bài viết.
+          </p>
         </div>
         <div className="header-actions">
-          <button 
-            className="btn-primary"
-            onClick={() => setShowCategoryForm(!showCategoryForm)}
-          >
+          <button className="btn-primary" onClick={() => setShowCategoryForm(!showCategoryForm)}>
             <FiTag /> Quản lý Danh mục
           </button>
-          <button 
+          <button
             className="btn-success"
             onClick={() => {
               resetPostForm()
@@ -317,7 +503,6 @@ function AdminNewsAPI() {
 
       <div className="admin-news-layout">
         <aside className="admin-news-left">
-          {/* CATEGORY MANAGEMENT */}
           {showCategoryForm && (
             <div className="card category-section">
               <div className="card-header">
@@ -333,14 +518,14 @@ function AdminNewsAPI() {
                       type="text"
                       placeholder="Tên danh mục"
                       value={categoryForm.category_name}
-                      onChange={(e) => setCategoryForm({...categoryForm, category_name: e.target.value})}
+                      onChange={(e) => setCategoryForm({ ...categoryForm, category_name: e.target.value })}
                       className="form-input"
                     />
                     <input
                       type="text"
                       placeholder="Mô tả (tùy chọn)"
                       value={categoryForm.description}
-                      onChange={(e) => setCategoryForm({...categoryForm, description: e.target.value})}
+                      onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
                       className="form-input"
                     />
                     <button type="submit" className="btn-primary">
@@ -353,13 +538,13 @@ function AdminNewsAPI() {
                   {categories.length === 0 ? (
                     <p className="text-muted">Chưa có danh mục nào</p>
                   ) : (
-                    categories.map(cat => (
+                    categories.map((cat) => (
                       <div key={cat.category_id} className="category-item">
                         <div className="category-info">
                           <strong>{cat.category_name}</strong>
                           {cat.description && <span className="text-muted">— {cat.description}</span>}
                         </div>
-                        <button 
+                        <button
                           className="btn-icon btn-danger"
                           onClick={() => handleDeleteCategory(cat.category_id)}
                           title="Xóa danh mục"
@@ -374,7 +559,6 @@ function AdminNewsAPI() {
             </div>
           )}
 
-          {/* POST FORM */}
           {showPostForm && (
             <div className="card post-form-section">
               <div className="card-header">
@@ -389,12 +573,12 @@ function AdminNewsAPI() {
                     <label>Danh mục *</label>
                     <select
                       value={postForm.category_id}
-                      onChange={(e) => setPostForm({...postForm, category_id: e.target.value})}
+                      onChange={(e) => setPostForm({ ...postForm, category_id: e.target.value })}
                       className="form-select"
                       required
                     >
                       <option value="">-- Chọn danh mục --</option>
-                      {categories.map(cat => (
+                      {categories.map((cat) => (
                         <option key={cat.category_id} value={cat.category_id}>
                           {cat.category_name}
                         </option>
@@ -407,7 +591,7 @@ function AdminNewsAPI() {
                     <input
                       type="text"
                       value={postForm.title}
-                      onChange={(e) => setPostForm({...postForm, title: e.target.value})}
+                      onChange={(e) => setPostForm({ ...postForm, title: e.target.value })}
                       className="form-input"
                       placeholder="Nhập tiêu đề bài viết"
                       required
@@ -415,38 +599,53 @@ function AdminNewsAPI() {
                   </div>
 
                   <div className="form-group">
-                    <label>Ảnh thumbnail (URL)</label>
-                    <div className="input-with-icon">
-                      <FiImage />
+                    <label>Ảnh thumbnail</label>
+                    <div className="input-with-icon" style={{ display: "flex", gap: 8 }}>
+                      <label className="btn-secondary" style={{ cursor: "pointer" }}>
+                        <FiUpload /> {thumbnailUploading ? "Đang upload..." : "Upload ảnh"}
+                        <input type="file" accept="image/*" onChange={handleThumbnailUpload} style={{ display: "none" }} />
+                      </label>
                       <input
                         type="text"
                         value={postForm.thumbnail_url}
-                        onChange={(e) => setPostForm({...postForm, thumbnail_url: e.target.value})}
+                        onChange={(e) => setPostForm({ ...postForm, thumbnail_url: e.target.value })}
                         className="form-input"
-                        placeholder="https://example.com/image.jpg"
+                        placeholder="URL ảnh thumbnail"
                       />
                     </div>
                     {postForm.thumbnail_url && (
-                      <img 
-                        src={postForm.thumbnail_url} 
-                        alt="Preview" 
+                      <img
+                        src={postForm.thumbnail_url}
+                        alt="Preview"
                         className="thumbnail-preview"
-                        onError={(e) => e.target.style.display = 'none'}
+                        onError={(e) => (e.target.style.display = "none")}
                       />
                     )}
                   </div>
 
                   <div className="form-group">
                     <label>Nội dung bài viết *</label>
-                    <textarea
-                      value={postForm.content_html}
-                      onChange={(e) => setPostForm({ ...postForm, content_html: e.target.value })}
-                      placeholder="Nhập nội dung tin tức (hỗ trợ HTML cơ bản)..."
-                      className="form-textarea news-editor"
-                      rows="8"
-                    />
+
+                    <div className="tiptap-toolbar">
+                      <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className="btn-icon">B</button>
+                      <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className="btn-icon"><i>I</i></button>
+                      <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className="btn-icon"><u>U</u></button>
+                      <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className="btn-icon">• List</button>
+                      <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className="btn-icon">1. List</button>
+                      <button type="button" onClick={() => editor?.chain().focus().setTextAlign("left").run()} className="btn-icon">⬅</button>
+                      <button type="button" onClick={() => editor?.chain().focus().setTextAlign("center").run()} className="btn-icon">↔</button>
+                      <button type="button" onClick={() => editor?.chain().focus().setTextAlign("right").run()} className="btn-icon">➡</button>
+                      <button type="button" onClick={handleInsertImage} className="btn-icon"><FiImage /></button>
+                      <button type="button" onClick={handleInsertVideo} className="btn-icon"><FiUpload /> Video</button>
+                      <button type="button" onClick={handleInsertYoutube} className="btn-icon">YouTube</button>
+                    </div>
+
+                    <div className="tiptap-editor">
+                      <EditorContent editor={editor} />
+                    </div>
+
                     <small className="editor-hint">
-                      💡 Bạn có thể nhập HTML cơ bản: &lt;h2&gt;Tiêu đề&lt;/h2&gt;, &lt;p&gt;Đoạn văn&lt;/p&gt;, &lt;img src="..."&gt;, &lt;a href="..."&gt;Liên kết&lt;/a&gt;
+                      {editorUploading ? "Đang upload media..." : "Nội dung sẽ lưu dưới dạng HTML."}
                     </small>
                   </div>
 
@@ -454,7 +653,7 @@ function AdminNewsAPI() {
                     <label>Trạng thái</label>
                     <select
                       value={postForm.status}
-                      onChange={(e) => setPostForm({...postForm, status: e.target.value})}
+                      onChange={(e) => setPostForm({ ...postForm, status: e.target.value })}
                       className="form-select"
                     >
                       <option value="DRAFT">Nháp</option>
@@ -467,17 +666,10 @@ function AdminNewsAPI() {
                     <button type="button" className="btn-secondary" onClick={resetPostForm}>
                       <FiX /> Hủy
                     </button>
-                    <button 
-                      type="button" 
-                      className="btn-warning"
-                      onClick={(e) => handleSubmitPost(e, "DRAFT")}
-                    >
+                    <button type="button" className="btn-warning" onClick={(e) => handleSubmitPost(e, "DRAFT")}>
                       <FiSave /> Lưu nháp
                     </button>
-                    <button 
-                      type="submit" 
-                      className="btn-success"
-                    >
+                    <button type="submit" className="btn-success">
                       <FiCheckCircle /> {editingPostId ? "Cập nhật" : "Đăng bài"}
                     </button>
                   </div>
@@ -485,11 +677,9 @@ function AdminNewsAPI() {
               </div>
             </div>
           )}
-
         </aside>
 
         <section className="admin-news-right">
-          {/* FILTERS */}
           <div className="card filters-section">
             <div className="card-header">
               <h3><FiSearch /> Bộ lọc nhanh</h3>
@@ -518,7 +708,7 @@ function AdminNewsAPI() {
                     className="form-select"
                   >
                     <option value="ALL">Tất cả danh mục</option>
-                    {categories.map(cat => (
+                    {categories.map((cat) => (
                       <option key={cat.category_id} value={String(cat.category_id)}>
                         {cat.category_name}
                       </option>
@@ -543,7 +733,6 @@ function AdminNewsAPI() {
             </div>
           </div>
 
-          {/* POSTS LIST */}
           <div className="card posts-section">
             <div className="card-header">
               <h3>📝 Danh sách bài viết ({filteredPosts.length})</h3>
@@ -555,7 +744,7 @@ function AdminNewsAPI() {
                 <p className="text-muted">Không có bài viết nào</p>
               ) : (
                 <div className="posts-list">
-                  {filteredPosts.map(post => (
+                  {filteredPosts.map((post) => (
                     <div key={post.post_id} className="post-item">
                       <div className="post-thumbnail">
                         {post.thumbnail_url ? (
@@ -572,7 +761,7 @@ function AdminNewsAPI() {
                           <span className="post-category">
                             <FiTag /> {categoryMap[post.category_id] || "Không rõ"}
                           </span>
-                          <span className={`post-status status-${post.status.toLowerCase()}`}>
+                          <span className={`post-status status-${String(post.status || "").toLowerCase()}`}>
                             {statusIcon(post.status)} {statusLabel(post.status)}
                           </span>
                         </div>
@@ -586,16 +775,16 @@ function AdminNewsAPI() {
                         <div className="post-info">
                           <span><FiEye /> {post.view_count || 0} lượt xem</span>
                           {post.published_at && (
-                            <span>📅 {new Date(post.published_at).toLocaleDateString('vi-VN')}</span>
+                            <span>📅 {new Date(post.published_at).toLocaleDateString("vi-VN")}</span>
                           )}
                           {post.updated_at && (
-                            <span>🛠️ Cập nhật: {new Date(post.updated_at).toLocaleDateString('vi-VN')}</span>
+                            <span>🛠️ Cập nhật: {new Date(post.updated_at).toLocaleDateString("vi-VN")}</span>
                           )}
                         </div>
                       </div>
 
                       <div className="post-actions">
-                        <button 
+                        <button
                           className="btn-icon btn-primary"
                           onClick={() => handleEditPost(post)}
                           title="Chỉnh sửa"
@@ -604,7 +793,7 @@ function AdminNewsAPI() {
                         </button>
 
                         {post.status === "DRAFT" && (
-                          <button 
+                          <button
                             className="btn-icon btn-success"
                             onClick={() => handleChangeStatus(post.post_id, "PUBLISHED")}
                             title="Đăng bài"
@@ -614,7 +803,7 @@ function AdminNewsAPI() {
                         )}
 
                         {post.status === "PUBLISHED" && (
-                          <button 
+                          <button
                             className="btn-icon btn-warning"
                             onClick={() => handleChangeStatus(post.post_id, "HIDDEN")}
                             title="Ẩn bài"
@@ -624,7 +813,7 @@ function AdminNewsAPI() {
                         )}
 
                         {post.status === "HIDDEN" && (
-                          <button 
+                          <button
                             className="btn-icon btn-info"
                             onClick={() => handleChangeStatus(post.post_id, "PUBLISHED")}
                             title="Hiện bài"
@@ -633,7 +822,7 @@ function AdminNewsAPI() {
                           </button>
                         )}
 
-                        <button 
+                        <button
                           className="btn-icon btn-danger"
                           onClick={() => handleDeletePost(post.post_id)}
                           title="Xóa"

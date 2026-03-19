@@ -1039,3 +1039,63 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== TipTap minimal patch ===== */
+.tiptap-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 0;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+}
+
+.tiptap-editor {
+  border: 1px solid #e0e0e0;
+  border-radius: 0 0 10px 10px;
+  background: #fff;
+  min-height: 320px;
+}
+
+.tiptap-editor .ProseMirror {
+  min-height: 320px;
+  padding: 16px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #1f2937;
+  outline: none;
+}
+
+.tiptap-editor .ProseMirror p {
+  margin: 0 0 12px;
+}
+
+.tiptap-editor .ProseMirror img,
+.tiptap-editor .ProseMirror video {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  margin: 12px auto;
+}
+
+.tiptap-editor .ProseMirror video {
+  width: 100%;
+}
+
+.tiptap-editor .ProseMirror iframe {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: 8px;
+  display: block;
+  margin: 12px auto;
+}

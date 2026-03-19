@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { FiCalendar, FiUser, FiTag, FiClock, FiEye } from 'react-icons/fi';
+import { useState, useEffect, useMemo } from 'react';
+import { FiCalendar, FiUser, FiTag, FiEye } from 'react-icons/fi';
 import '../styles/News.css';
 import Breadcrumb from '../components/Breadcrumb';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -20,13 +20,27 @@ export default function News() {
   useEffect(() => {
     loadCategories();
     if (id) {
-      // Nếu có ID từ URL, tải bài viết chi tiết
       loadNewsDetail(id);
     } else {
-      // Nếu không có ID, tải danh sách bài viết
+      setSelectedNews(null);
       loadNews();
     }
   }, [id]);
+
+  const breadcrumbItems = useMemo(() => {
+    if (!id) {
+      return [
+        { label: "Trang chủ", path: "/" },
+        { label: "Tin tức" },
+      ];
+    }
+
+    return [
+      { label: "Trang chủ", path: "/" },
+      { label: "Tin tức", path: "/news" },
+      { label: selectedNews?.title || "Chi tiết bài viết" },
+    ];
+  }, [id, selectedNews]);
 
   const loadNewsDetail = async (postId) => {
     try {
@@ -37,7 +51,7 @@ export default function News() {
       }
     } catch (error) {
       console.error("Error loading news detail:", error);
-      loadNews(); // Nếu lỗi, quay lại danh sách
+      loadNews();
     } finally {
       setLoading(false);
     }
@@ -70,7 +84,7 @@ export default function News() {
 
   const handleCategoryFilter = async (categoryId) => {
     setSelectedCategory(categoryId);
-    
+
     if (categoryId === "ALL") {
       loadNews();
     } else {
@@ -95,25 +109,14 @@ export default function News() {
   const handleBackToList = () => {
     navigate('/news');
   };
-  const handleGoBack = () => {
-    navigate('/');
-  }
-  
 
   return (
     <div className="news-page">
+      <Breadcrumb items={breadcrumbItems} />
+
       <div className="news-container">
         {!id ? (
           <>
-           {/* <button className="back-btn" onClick={handleGoBack}>
-              ← Quay lại
-            </button> */}
-            {/* <div className="news-header">
-              <h1>Tin Tức & Công Nghệ</h1>
-              <p>Cập nhật thông tin mới nhất về laptop, công nghệ và xu hướng thị trường</p>
-            </div> */}
-
-            {/* Category filters */}
             {categories.length > 0 && (
               <div className="news-filters">
                 <button
@@ -143,11 +146,11 @@ export default function News() {
                 {newsData.map((news) => (
                   <article key={news.post_id} className="news-card">
                     <div className="news-image">
-                      <img 
-                        src={news.thumbnail_url 
+                      <img
+                        src={news.thumbnail_url
                           ? (news.thumbnail_url.startsWith('http') ? news.thumbnail_url : `${API_URL.replace('/api/blog', '')}${news.thumbnail_url}`)
-                          : "https://via.placeholder.com/800x450?text=No+Image"} 
-                        alt={news.title} 
+                          : "https://via.placeholder.com/800x450?text=No+Image"}
+                        alt={news.title}
                       />
                       <span className="news-category">{news.category_name || "Tin tức"}</span>
                     </div>
@@ -164,13 +167,13 @@ export default function News() {
                           <FiEye size={14} /> {news.view_count || 0} lượt xem
                         </span>
                       </div>
-                      <div 
+                      <div
                         className="news-excerpt"
-                        dangerouslySetInnerHTML={{ 
-                          __html: news.content_html.substring(0, 150) + "..." 
+                        dangerouslySetInnerHTML={{
+                          __html: news.content_html.substring(0, 150) + "..."
                         }}
                       />
-                      <button 
+                      <button
                         className="read-more-btn"
                         onClick={() => handleReadMore(news)}
                       >
@@ -207,13 +210,13 @@ export default function News() {
               </div>
             </div>
             {selectedNews.thumbnail_url && (
-              <img 
+              <img
                 src={selectedNews.thumbnail_url.startsWith('http') ? selectedNews.thumbnail_url : `${API_URL.replace('/api/blog', '')}${selectedNews.thumbnail_url}`}
-                alt={selectedNews.title} 
-                className="detail-image" 
+                alt={selectedNews.title}
+                className="detail-image"
               />
             )}
-            <div 
+            <div
               className="detail-content"
               dangerouslySetInnerHTML={{ __html: selectedNews.content_html }}
             />
