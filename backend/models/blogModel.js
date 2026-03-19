@@ -207,6 +207,33 @@ const Blog = {
         const [result] = await db.query(query, [postId]);
         return result.affectedRows > 0;
     },
+    // Cập nhật trạng thái bài viết (DRAFT | PUBLISHED | HIDDEN)
+    updatePostStatus: async (postId, status) => {
+        // Lấy bài hiện tại để xử lý published_at hợp lý
+        const currentPost = await Blog.getPostById(postId);
+        if (!currentPost) return false;
+
+        let published_at = currentPost.published_at || null;
+
+        // Nếu chuyển sang PUBLISHED lần đầu thì set thời gian publish
+        if (status === 'PUBLISHED' && !published_at) {
+            published_at = new Date();
+        }
+
+        // Nếu chuyển về DRAFT thì bỏ published_at
+        if (status === 'DRAFT') {
+            published_at = null;
+        }
+
+        // Nếu HIDDEN: giữ nguyên published_at cũ
+        const query = `
+            UPDATE blog_posts
+            SET status = ?, published_at = ?
+            WHERE post_id = ?
+        `;
+        const [result] = await db.query(query, [status, published_at, postId]);
+        return result.affectedRows > 0;
+    },
 
     // Tìm kiếm bài viết
     searchPosts: async (keyword) => {
