@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiPackage, FiTruck, FiCheckCircle, FiArrowLeft, FiCalendar, FiMapPin } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
-import { readOrdersForUser } from '../lib/orderStorage'
+import * as orderApi from '../services/orderApiEnhanced'
+//import { readOrdersForUser } from '../lib/orderStorage'
 import '../styles/OrderTracking.css'
 
 export default function OrderTracking() {
@@ -10,18 +11,49 @@ export default function OrderTracking() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const mapBackendStatus = (status) => {
+  const map = {
+    PENDING_CONFIRMATION: 'cho-xac-nhan',
+    PROCESSING: 'dang-xu-ly',
+    SHIPPING: 'dang-giao',
+    COMPLETED: 'hoan-thanh',
+    CANCELLED: 'da-huy',
+  }
+  return map[status] || 'cho-xac-nhan'
+}
 
   useEffect(() => {
+  const fetchOrders = async () => {
     if (!user?.user_id) {
       setOrders([])
       setSelectedOrder(null)
       return
     }
 
-    const userOrders = readOrdersForUser(user.user_id, user.name)
-    setOrders(userOrders)
-    setSelectedOrder(userOrders[0] || null)
-  }, [user])
+    try {
+      const res = await orderApi.getOrders({ user_id: user.user_id })
+      const list = Array.isArray(res?.data) ? res.data : []
+
+      const mapped = list.map(order => ({
+        id: order.order_id,
+        customer: order.customer_name,
+        total: Number(order.total_amount || 0),
+        status: mapBackendStatus(order.status), // 🔥 map lại status
+        date: order.order_date
+          ? new Date(order.order_date).toLocaleDateString('vi-VN')
+          : '',
+        preOrder: order.order_type === "PRE_ORDER",
+      }))
+
+      setOrders(mapped)
+      setSelectedOrder(mapped[0] || null)
+    } catch (err) {
+      console.error("Error loading orders:", err)
+    }
+  }
+
+  fetchOrders()
+}, [user])
 
   const getTrackingSteps = (order) => {
     const steps = [

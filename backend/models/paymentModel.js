@@ -27,8 +27,8 @@ const Payment = {
     // [READ] Kiểm tra payment đã tồn tại chưa
     // ✅ Chỉ SELECT các cột cần thiết, không SELECT *
     // ================================================================
-    getByOrderId: async (order_id) => {
-        const [rows] = await db.query(
+    getByOrderId: async (order_id, connection = db) => {
+        const [rows] = await connection.query(
             `SELECT
                 payment_id,
                 order_id,
@@ -44,8 +44,8 @@ const Payment = {
         return rows[0] || null;
     },
 
-    markAsPaidIfNeeded: async (order_id, transaction_id = null) => {
-        const [result] = await db.query(
+    markAsPaidIfNeeded: async (order_id, transaction_id = null, connection = db) => {
+        const [result] = await connection.query(
             `UPDATE payments
              SET payment_status = 'PAID',
                  transaction_id = COALESCE(?, transaction_id)
@@ -61,14 +61,14 @@ const Payment = {
     // ✅ Whitelist tại Model — không để Controller tự do truyền vào
     // ✅ Không nối string query động → tránh SQL Injection
     // ================================================================
-    updatePaymentStatus: async (order_id, status, transaction_id = null) => {
+    updatePaymentStatus: async (order_id, status, transaction_id = null, connection = db) => {
         // ✅ Double-check whitelist tại Model (Controller cũng đã check)
         if (!ALLOWED_PAYMENT_STATUSES.includes(status)) {
             throw new Error('INVALID_PAYMENT_STATUS');
         }
 
         // ✅ Dùng CASE thay vì nối string → an toàn, không SQL Injection
-        const [result] = await db.query(
+        const [result] = await connection.query(
             `UPDATE payments
             SET
                 payment_status = ?,

@@ -2,7 +2,9 @@ const Order = require('../models/orderModel');
 const Product = require('../models/productModel');
 const User = require('../models/userModel');
 const UserAddress = require('../models/userAddressModel');
+const db = require('../config/db');
 const Voucher = require('../models/voucherModel'); // Cần VoucherModel để kiểm tra voucher_id
+const notificationService = require('../services/notificationService');
 
 const { parseQueryParams, getOffset, buildPaginationResult } = require('../helpers/queryHelper');
 const { isValidId } = require('../helpers/productValidationHelper'); // Dùng chung isValidId
@@ -80,6 +82,8 @@ const orderController = {
             };
 
             const newOrderId = await Order.createOrder(orderDataForModel, items);
+
+            await notificationService.notifyByTemplate(user_id, 'ORDER_CREATED', { orderId: newOrderId });
 
             res.status(201).json({
                 success: true,
@@ -186,19 +190,32 @@ const orderController = {
                  return res.status(400).json({ success: false, message: 'Định dạng ngày giao hàng dự kiến không hợp lệ (YYYY-MM-DD).' });
             }
 
-            const affectedRows = await Order.updateOrderStatus(id, newStatus, estimated_delivery_date);
+            const connection = await db.getConnection();
+            try {
+                await connection.beginTransaction();
 
-            if (affectedRows === 0) {
-                return res.status(400).json({ success: false, message: 'Không có thay đổi nào được thực hiện hoặc đơn hàng không tồn tại.' });
+                const affectedRows = await Order.updateOrderStatus(id, newStatus, estimated_delivery_date, connection);
+
+                if (affectedRows === 0) {
+                    await connection.rollback();
+                    return res.status(400).json({ success: false, message: 'Không có thay đổi nào được thực hiện hoặc đơn hàng không tồn tại.' });
+                }
+
+                await connection.commit();
+                res.status(200).json({
+                    success: true,
+                    message: `Trạng thái đơn hàng ID ${id} đã được cập nhật thành "${newStatus}" thành công!`,
+                    data: { order_id: id, new_status: newStatus }
+                });
+            } catch (error) {
+                await connection.rollback();
+                throw error;
+            } finally {
+                connection.release();
             }
 
-            res.status(200).json({
-                success: true,
-                message: `Trạng thái đơn hàng ID ${id} đã được cập nhật thành "${newStatus}" thành công!`,
-                data: { order_id: id, new_status: newStatus }
-            });
         } catch (error) {
-            console.error('Lỗi khi cập nhật trạng thái đơn hàng:', error.message);
+            console.error('Lỗi khi cập nhật trạng thái đơn hàng:', error);
             res.status(500).json({ success: false, message: error.message || 'Lỗi máy chủ nội bộ khi cập nhật trạng thái đơn hàng' });
         }
     },
@@ -218,23 +235,34 @@ const orderController = {
             // Admin có thể hủy bất kỳ đơn hàng nào.
             // User chỉ có thể hủy đơn hàng của chính mình và theo các quy tắc đã định.
 
-            const affectedRows = await Order.updateOrderStatus(id, 'CANCELLED');
+            const connection = await db.getConnection();
+            try {
+                await connection.beginTransaction();
 
-            if (affectedRows === 0) {
-                return res.status(400).json({ success: false, message: 'Không thể hủy đơn hàng. Có thể đơn hàng đã bị hủy hoặc không tồn tại.' });
+                const affectedRows = await Order.updateOrderStatus(id, 'CANCELLED', null, connection);
+
+                if (affectedRows === 0) {
+                    await connection.rollback();
+                    return res.status(400).json({ success: false, message: 'Không thể hủy đơn hàng. Có thể đơn hàng đã bị hủy hoặc không tồn tại.' });
+                }
+
+                await connection.commit();
+                res.status(200).json({
+                    success: true,
+                    message: `Đơn hàng ID ${id} đã được hủy thành công!`,
+                    data: { order_id: id, new_status: 'CANCELLED' }
+                });
+            } catch (error) {
+                await connection.rollback();
+                throw error;
+            } finally {
+                connection.release();
             }
-
-            res.status(200).json({
-                success: true,
-                message: `Đơn hàng ID ${id} đã được hủy thành công!`,
-                data: { order_id: id, new_status: 'CANCELLED' }
-            });
         } catch (error) {
             console.error('Lỗi khi hủy đơn hàng:', error.message);
             res.status(500).json({ success: false, message: error.message || 'Lỗi máy chủ nội bộ khi hủy đơn hàng' });
         }
     }
-    // Các API khác cho "Yêu cầu đổi/hoàn trả", "Quản lý đơn hàng riêng", "Xuất hóa đơn" sẽ được xây dựng sau
 };
 
 module.exports = orderController;

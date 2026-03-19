@@ -87,8 +87,8 @@ const Notification = {
         return result.affectedRows;
     },
 
-    create: async (userId, title, content, type, referenceId = null, linkUrl = null) => {
-        const [result] = await db.query(
+    create: async (userId, title, content, type, referenceId = null, linkUrl = null, connection = db) => {
+        const [result] = await connection.query(
             `INSERT INTO notifications (user_id, title, content, type, reference_id, link_url, is_read)
              VALUES (?, ?, ?, ?, ?, ?, FALSE)`,
             [userId, title, content, type, referenceId, linkUrl]
@@ -97,8 +97,8 @@ const Notification = {
     },
 
     // Tối ưu cho broadcast lớn: insert-select trực tiếp trong DB
-    createBulkForActiveUsers: async (title, content, type, referenceId = null, linkUrl = null) => {
-        const [result] = await db.query(
+    createBulkForActiveUsers: async (title, content, type, referenceId = null, linkUrl = null, connection = db) => {
+        const [result] = await connection.query(
             `INSERT INTO notifications (user_id, title, content, type, reference_id, link_url, is_read)
              SELECT user_id, ?, ?, ?, ?, ?, FALSE
              FROM users

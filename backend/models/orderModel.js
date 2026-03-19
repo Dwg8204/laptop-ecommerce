@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { getSafeSort, getOffset, buildPaginationResult } = require('../helpers/queryHelper');
 const { VALID_ORDER_TYPES, VALID_ORDER_STATUSES } = require('../helpers/orderValidationHelper');
+const notificationService = require('../services/notificationService');
 
 const ALLOWED_SORT_FIELDS = {
     order_id: 'o.order_id',
@@ -298,11 +299,12 @@ const Order = {
             throw new Error(`Trạng thái "${newStatus}" không hợp lệ.`);
         }
 
-        const [orderRows] = await connection.query('SELECT status, order_type, voucher_id FROM orders WHERE order_id = ? FOR UPDATE', [orderId]);
+        const [orderRows] = await connection.query('SELECT user_id, status, order_type, voucher_id FROM orders WHERE order_id = ? FOR UPDATE', [orderId]);
         if (orderRows.length === 0) {
             throw new Error('Đơn hàng không tồn tại.');
         }
         const currentOrder = orderRows[0];
+        const userId = currentOrder.user_id;
 
         // Logic chuyển trạng thái
         // Ví dụ: Không thể chuyển từ COMPLETED về PENDING
@@ -337,7 +339,7 @@ const Order = {
             const [details] = await connection.query('SELECT variant_id, quantity FROM order_details WHERE order_id = ?', [orderId]);
             for (const detail of details) {
                 // Kiểm tra lại tồn kho trước khi trừ
-                const [variantStock] = await db.query('SELECT stock_quantity FROM product_variants WHERE variant_id = ? FOR UPDATE', [detail.variant_id]);
+                const [variantStock] = await connection.query('SELECT stock_quantity FROM product_variants WHERE variant_id = ? FOR UPDATE', [detail.variant_id]);
                 if (variantStock.length === 0 || variantStock[0].stock_quantity < detail.quantity) {
                     throw new Error(`Không đủ tồn kho cho phiên bản sản phẩm ID ${detail.variant_id} để xác nhận đơn đặt trước.`);
                 }
@@ -362,7 +364,14 @@ const Order = {
             `UPDATE orders SET ${setClauses.join(', ')} WHERE order_id = ?`,
             values
         );
-        return result.affectedRows;
+        const affectedRows = result.affectedRows;
+
+        // Gửi thông báo real-time nếu trạng thái thực sự thay đổi
+        if (affectedRows > 0 && currentOrder.status !== newStatus) {
+            await notificationService.notifyOrderStatusChange(orderId, userId, currentOrder.status, newStatus, connection);
+        }
+
+        return affectedRows;
     },
 
     /**
