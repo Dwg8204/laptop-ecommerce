@@ -8,6 +8,8 @@ import '../styles/header.css'
 import { useCart } from '../context/CartContext'
 import { useProducts } from '../context/ProductContext'
 import { useNotifications } from '../context/NotificationContext'
+import { buildApiUrl } from "../config/api"
+import SearchSuggestBox from "./SearchSuggestBox";
 
 export default function Header() {
   const [showAuth, setShowAuth] = useState(false)
@@ -19,7 +21,20 @@ export default function Header() {
   const  {getTotalItems} = useCart()
   const { products } = useProducts()
   const { unreadCount } = useNotifications()
-  
+  const [categoryItems, setCategoryItems] = useState([])
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await fetch(buildApiUrl("/api/product-categories"))
+        const data = await res.json().catch(() => ({}))
+        setCategoryItems(Array.isArray(data?.data) ? data.data : [])
+      } catch {
+        setCategoryItems([])
+      }
+    }
+    loadCategories()
+  }, [])
   const topBarContent = [
     '⚙️ Thu cũ giá ngon - Lên đời tiết kiệm',
     '✅ Sản phẩm chính hãng - Xuất VAT đầy đủ',
@@ -65,7 +80,7 @@ export default function Header() {
 
   const handleCategoryClick = (category) => {
     setShowCategoryMenu(false)
-    navigate(`/?category=${encodeURIComponent(category)}`)
+    navigate(`/categories/${category.category_id}`)
   }
 
   return (
@@ -103,34 +118,37 @@ export default function Header() {
               Danh mục
             </button>
             {showCategoryMenu && (
-              <div style={styles.categoryDropdown}>
-                {categories.length === 0 ? (
-                  <button style={styles.categoryItem} type="button" disabled>
-                    Chưa có danh mục
-                  </button>
-                ) : (
-                  categories.map((category) => (
-                    <button
-                      key={category}
-                      style={styles.categoryItem}
-                      type="button"
-                      onClick={() => handleCategoryClick(category)}
-                    >
-                      {category}
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
+        <div style={styles.categoryDropdown}>
+          {categoryItems.length === 0 ? (
+            <button style={styles.categoryItem} type="button" disabled>
+              Chưa có danh mục
+            </button>
+          ) : (
+            categoryItems.map((category) => (
+              <button
+                key={category.category_id}
+                style={styles.categoryItem}
+                type="button"
+                onClick={() => handleCategoryClick(category)}
+              >
+                {category.category_name}
+              </button>
+            ))
+          )}
+        </div>
+      )}
           </div>
 
-          <div style={styles.searchContainer}>
+          {/* <div style={styles.searchContainer}>
             <FiSearch style={styles.searchIcon} />
             <input
               type="text"
               placeholder="Bạn muốn mua gì hôm nay?"
               style={styles.searchInput}
             />
+          </div> */}
+          <div className="header-search-area">
+            <SearchSuggestBox />
           </div>
 
           {/* Actions */}

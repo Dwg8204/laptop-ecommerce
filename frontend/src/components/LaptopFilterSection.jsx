@@ -1,7 +1,7 @@
 import "../styles/LaptopFilterSection.css"
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { buildApiUrl } from "../config/api"
-import { use } from "react";
 // const brands = [
 //   "MacBook",
 //   "ASUS",
@@ -33,6 +33,7 @@ const resolveLogoUrl = (url) => {
 
 export default function LaptopFilterSection() {
   const [brands, setBrands] = useState([])
+  const navigate = useNavigate()
   const [category, setCategory] = useState([])
   useEffect(() => {
     const loadBrands = async () => {
@@ -69,14 +70,19 @@ export default function LaptopFilterSection() {
       <h2 className="section-title">Máy tính laptop</h2>
       <div className="brand-list">
         {brands.map((brand) => (
-          <div className="brand-item" key={brand.brand_id} title={brand.brand_name}>
+          <div
+            className="brand-item"
+            key={brand.brand_id}
+            title={brand.brand_name}
+            onClick={() => navigate(`/brands/${brand.brand_id}`)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") navigate(`/brands/${brand.brand_id}`)
+            }}
+          >
             {brand.logo_url ? (
-              <img
-                className="brand-logo"
-                src={resolveLogoUrl(brand.logo_url)}
-                alt={brand.brand_name}
-                loading="lazy"
-              />
+              <img className="brand-logo" src={resolveLogoUrl(brand.logo_url)} alt={brand.brand_name} loading="lazy" />
             ) : (
               <span className="brand-fallback">{brand.brand_name}</span>
             )}

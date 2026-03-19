@@ -16,7 +16,8 @@ import News from "./pages/News"
 import Notifications from "./pages/Notifications"
 import ResetPassword from "./pages/ResetPassword"
 import FacebookCallback from "./pages/FacebookCallback"
-
+import BrandProductsPage from "./pages/BrandProductsPage"
+import CategoryProductsPage from "./pages/CategoryProductsPage"
 // THÊM MỚI: Component trung gian — lấy onAuthChange từ CartContext
 // rồi truyền vào AuthProvider để AuthContext thông báo cho CartContext
 // khi login / logout / restore session.
@@ -54,6 +55,8 @@ function App() {
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/order-tracking" element={<OrderTracking />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/brands/:brandId" element={<BrandProductsPage />} />
+                  <Route path="/categories/:categoryId" element={<CategoryProductsPage />} />
                 </Route>
               </Routes>
             </BrowserRouter>
