@@ -1,8 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
-import { AuthProvider } from "./context/AuthContext"
 import { NotificationProvider } from "./context/NotificationContext"
 import { ProductProvider } from "./context/ProductContext"
-import { CartProvider } from "./context/CartContext"
+import { CartProvider, useCart } from "./context/CartContext"
+import { AuthProvider } from "./context/AuthContext"
 import MainLayout from "./layouts/MainLayout"
 import Home from "./pages/Home"
 import Laptop from "./pages/Laptop"
@@ -17,12 +17,27 @@ import Notifications from "./pages/Notifications"
 import ResetPassword from "./pages/ResetPassword"
 import FacebookCallback from "./pages/FacebookCallback"
 
+// THÊM MỚI: Component trung gian — lấy onAuthChange từ CartContext
+// rồi truyền vào AuthProvider để AuthContext thông báo cho CartContext
+// khi login / logout / restore session.
+// Không thể import useCart trực tiếp trong AuthProvider vì sẽ circular dependency.
+function AuthBridge({ children }) {
+  const { onAuthChange } = useCart()
+  return (
+    <AuthProvider onAuthChange={onAuthChange}>
+      {children}
+    </AuthProvider>
+  )
+}
+
 function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <ProductProvider>
-          <CartProvider>
+    // THAY ĐỔI: CartProvider lên ngoài cùng (trước AuthProvider)
+    // để AuthBridge có thể gọi useCart()
+    <CartProvider>
+      <AuthBridge>
+        <NotificationProvider>
+          <ProductProvider>
             <BrowserRouter>
               <Routes>
                 <Route path="/reset-password" element={<ResetPassword />} />
@@ -40,12 +55,12 @@ function App() {
                   <Route path="/order-tracking" element={<OrderTracking />} />
                   <Route path="/admin" element={<Admin />} />
                 </Route>
-              </Routes> 
+              </Routes>
             </BrowserRouter>
-          </CartProvider>
-        </ProductProvider>
-      </NotificationProvider>
-    </AuthProvider>
+          </ProductProvider>
+        </NotificationProvider>
+      </AuthBridge>
+    </CartProvider>
   )
 }
 
