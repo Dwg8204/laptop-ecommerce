@@ -46,6 +46,14 @@ const voucherController = {
             if (req.body.voucher_code) {
                 req.body.voucher_code = normalizeVoucherCode(req.body.voucher_code); // ✅ Dùng helper
             }
+
+            if (req.body.max_discount_amount !== undefined && req.body.max_discount_amount !== null) {
+                req.body.max_discount_amount = parseFloat(req.body.max_discount_amount);
+                if (isNaN(req.body.max_discount_amount)) req.body.max_discount_amount = null; // Set null nếu không phải số
+            } else {
+                req.body.max_discount_amount = null; // Mặc định là null nếu không gửi
+            }
+
             const errors = validateVoucherData(req.body, false); // ✅ Dùng helper
             if (errors.length > 0) return res.status(400).json({ success: false, message: errors[0], errors });
 
@@ -67,6 +75,14 @@ const voucherController = {
             if (req.body.voucher_code) {
                 req.body.voucher_code = normalizeVoucherCode(req.body.voucher_code); // ✅ Dùng helper
             }
+
+            if (req.body.max_discount_amount !== undefined && req.body.max_discount_amount !== null) {
+                req.body.max_discount_amount = parseFloat(req.body.max_discount_amount);
+                if (isNaN(req.body.max_discount_amount)) req.body.max_discount_amount = null;
+            } else if (req.body.max_discount_amount === '') { // Xử lý nếu gửi chuỗi rỗng
+                req.body.max_discount_amount = null;
+            }
+            
             const errors = validateVoucherData(req.body, true); // ✅ Dùng helper
             if (errors.length > 0) return res.status(400).json({ success: false, message: errors[0], errors });
 

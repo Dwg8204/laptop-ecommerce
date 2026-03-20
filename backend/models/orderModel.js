@@ -70,7 +70,7 @@ const Order = {
             let voucher = null;
             if (voucher_id) {
                 const [voucherRows] = await connection.query(
-                    'SELECT voucher_id, discount_type, discount_value, min_order_value, remaining_quantity FROM vouchers WHERE voucher_id = ? AND expiration_date > NOW() AND remaining_quantity > 0 FOR UPDATE', // LOCK row
+                    'SELECT voucher_id, discount_type, discount_value, max_discount_amount, min_order_value, remaining_quantity FROM vouchers WHERE voucher_id = ? AND expiration_date > NOW() AND remaining_quantity > 0 FOR UPDATE', // LOCK row
                     [voucher_id]
                 );
                 if (voucherRows.length === 0) {
@@ -84,8 +84,16 @@ const Order = {
 
                 if (voucher.discount_type === 'PERCENTAGE') {
                     discount_amount = subtotal * (voucher.discount_value / 100);
+                    // Áp dụng max_discount_amount nếu có
+                    if (voucher.max_discount_amount !== null && discount_amount > voucher.max_discount_amount) {
+                        discount_amount = voucher.max_discount_amount;
+                    }
                 } else if (voucher.discount_type === 'FIXED_AMOUNT') {
                     discount_amount = voucher.discount_value;
+                    // max_discount_amount không áp dụng cho FIXED_AMOUNT, nhưng có thể muốn giới hạn discount_value không vượt quá subtotal
+                    if (discount_amount > subtotal) {
+                        discount_amount = subtotal; // Không giảm quá tổng tiền
+                    }
                 }
                 
                 // Giảm số lượng voucher còn lại
