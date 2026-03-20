@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { getSafeSort } = require('../helpers/queryHelper');
 const { VALID_STATUSES } = require('../helpers/productValidationHelper');
+const User = require('./userModel');
 
 const Product = {
     /**
@@ -273,7 +274,7 @@ const Product = {
      * @param {number} id - ID của sản phẩm.
      * @returns {Promise<Object|null>} Đối tượng sản phẩm hoặc null nếu không tìm thấy.
      */
-    getById: async (id) => {
+    getById: async (id, requestingUserId = null, isAdmin = false) => { // Thêm requestingUserId, isAdmin
         // 1. Lấy thông tin sản phẩm chính, hãng, danh mục, specs chung và highlight features
         const productQuery = `
             SELECT
@@ -341,21 +342,58 @@ const Product = {
 
 
         // 5. Lấy danh sách đánh giá của sản phẩm, bao gồm tên người dùng
-        const [reviewRows] = await db.query(
-            `SELECT
+        let reviewQuery = `
+            SELECT
                 pr.review_id,
                 pr.user_id,
                 u.full_name AS reviewer_name,
                 pr.rating,
                 pr.content,
-                pr.created_at
+                pr.created_at,
+                pr.status,
+                pr.admin_deletion_reason
             FROM product_reviews pr
             JOIN users u ON pr.user_id = u.user_id
             WHERE pr.product_id = ?
-            ORDER BY pr.created_at DESC`,
-            [id]
-        );
+        `;
+        const reviewParams = [id];
+
+        reviewQuery += ` AND (
+                           pr.status = 'VISIBLE' `; // Luôn hiển thị nếu là VISIBLE
+
+        if (isAdmin) {
+            // Admin xem được cả VISIBLE và DELETED_BY_ADMIN
+            reviewQuery += ` OR pr.status = 'DELETED_BY_ADMIN' `;
+        }
+        
+        if (requestingUserId) {
+            // Chính người đánh giá xem được đánh giá của mình dù bị xóa bởi user hay admin
+            reviewQuery += ` OR (pr.user_id = ? AND (pr.status = 'DELETED_BY_USER' OR pr.status = 'DELETED_BY_ADMIN')) `;
+            reviewParams.push(requestingUserId);
+        }
+
+        reviewQuery += ` ) ORDER BY pr.created_at DESC`; // Đóng ngoặc của điều kiện OR lớn
+
+        const [reviewRows] = await db.query(reviewQuery, reviewParams);
+        
+        // Lấy ảnh cho từng review và tính rating trung bình
+        let totalRating = 0;
+        let visibleReviewCount = 0;
+        for (const review of reviewRows) {
+            const [reviewImages] = await db.query(
+                'SELECT review_image_id, image_url FROM review_images WHERE review_id = ?',
+                [review.review_id]
+            );
+            review.images = reviewImages;
+
+            if (review.status === 'VISIBLE') {
+                totalRating += review.rating;
+                visibleReviewCount++;
+            }
+        }
         product.reviews = reviewRows;
+        product.average_rating = visibleReviewCount > 0 ? (totalRating / visibleReviewCount).toFixed(1) : 0; // Tính rating trung bình
+        product.total_visible_reviews = visibleReviewCount; // Tổng số review hiển thị
 
         return product;
     },

@@ -1,6 +1,9 @@
 const Product = require('../models/productModel');
 const Brand = require('../models/brandModel');
 const ProductCategory = require('../models/productCategoryModel');
+const User = require('../models/userModel');
+const jwt = require('jsonwebtoken');
+const uploadProduct = require('../middlewares/uploadProductImageMiddleware');
 const { parseQueryParams, getOffset, buildPaginationResult } = require('../helpers/queryHelper');
 const {
     validateProductData,
@@ -106,7 +109,23 @@ const productController = {
                 return res.status(400).json({ success: false, message: 'ID sản phẩm không hợp lệ.' });
             }
 
-            const product = await Product.getById(productId);
+            const token = req.headers.authorization?.split(' ')[1];
+            let requestingUserId = null;
+            let isAdmin = false;
+
+            if (token) {
+                try {
+                    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                    requestingUserId = decoded.user_id || decoded.id || decoded.userId;
+                    const userRoles = await User.getUserRoles(requestingUserId); // Cần có User.getUserRoles
+                    if (userRoles.some(r => r.role_name === 'ADMIN')) isAdmin = true;
+                } catch (e) {
+                    console.warn('Invalid token for product detail access:', e.message);
+                    // Token không hợp lệ, coi như người dùng chưa đăng nhập
+                }
+            }
+
+            const product = await Product.getById(productId, requestingUserId, isAdmin); // Truyền requestingUserId, isAdmin
 
             if (!product) {
                 return res.status(404).json({ success: false, message: 'Sản phẩm không tồn tại!' });
