@@ -3,7 +3,7 @@ const { isInWhitelist } = require('./validateHelper');  //Tái sử dụng helpe
 const ALLOWED_DISCOUNT_TYPES = ['PERCENTAGE', 'FIXED_AMOUNT'];
 
 const validateVoucherData = (data, isUpdate = false) => {
-    const { voucher_code, discount_type, discount_value,
+    const { voucher_code, discount_type, discount_value, max_discount_amount, // Thêm max_discount_amount
             expiration_date, remaining_quantity, min_order_value } = data;
     const errors = [];
 
@@ -27,6 +27,21 @@ const validateVoucherData = (data, isUpdate = false) => {
         const val = parseFloat(discount_value);
         if (isNaN(val) || val <= 0)                         errors.push('Giá trị giảm phải là số dương');
         else if (discount_type === 'PERCENTAGE' && val > 100) errors.push('Phần trăm giảm không được vượt quá 100%');
+        // Validation cho max_discount_amount
+        if (max_discount_amount !== undefined && discount_type === 'FIXED_AMOUNT' && max_discount_amount !== null) {
+            errors.push('max_discount_amount chỉ áp dụng cho loại giảm giá PERCENTAGE.');
+        }
+    }
+    // Validation cho max_discount_amount
+    if (max_discount_amount !== undefined && max_discount_amount !== null) {
+        const val = parseFloat(max_discount_amount);
+        if (isNaN(val) || val < 0) { // Có thể là 0 nếu không có giới hạn thực sự
+            errors.push('Giá trị giảm tối đa phải là số không âm.');
+        } else if (discount_type === 'FIXED_AMOUNT' && val > 0) {
+            errors.push('max_discount_amount chỉ áp dụng cho loại giảm giá PERCENTAGE.');
+        } else if (discount_type === 'PERCENTAGE' && discount_value !== undefined) {
+            const discountVal = parseFloat(discount_value);
+        }
     }
 
     if (min_order_value !== undefined && parseFloat(min_order_value) < 0) {

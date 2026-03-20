@@ -15,6 +15,7 @@ const SELECT_FIELDS = `
     voucher_code,
     discount_type,
     discount_value,
+    max_discount_amount, -- Thêm trường mới
     min_order_value,
     remaining_quantity,
     expiration_date
@@ -86,26 +87,29 @@ const Voucher = {
     },
 
     create: async (data) => {
-        const { voucher_code, discount_type, discount_value, min_order_value, remaining_quantity, expiration_date } = data;
+        const { voucher_code, discount_type, discount_value, max_discount_amount, min_order_value, remaining_quantity, expiration_date } = data;
         const [result] = await db.query(
-            `INSERT INTO vouchers (voucher_code, discount_type, discount_value, min_order_value, remaining_quantity, expiration_date)
-            VALUES (?, ?, ?, ?, ?, ?)`,
-            [voucher_code, discount_type, discount_value, min_order_value ?? 0, remaining_quantity ?? 0, expiration_date]
+            `INSERT INTO vouchers (voucher_code, discount_type, discount_value, max_discount_amount, min_order_value, remaining_quantity, expiration_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [voucher_code, discount_type, discount_value, max_discount_amount ?? null, min_order_value ?? 0, remaining_quantity ?? 0, expiration_date]
         );
         return result.insertId;
     },
 
     update: async (id, data) => {
         const UPDATABLE_FIELDS = [
-            'voucher_code', 'discount_type', 'discount_value',
+            'voucher_code', 'discount_type', 'discount_value', 'max_discount_amount', // Thêm trường mới
             'min_order_value', 'remaining_quantity', 'expiration_date'
         ];
 
         const setClauses = [];
         const values = [];
 
-        UPDATABLE_FIELDS.forEach(field => {
-            if (data[field] !== undefined) {
+       UPDATABLE_FIELDS.forEach(field => {
+            // Xử lý max_discount_amount nếu được truyền là null hoặc undefined
+            if (field === 'max_discount_amount' && data[field] === null) {
+                setClauses.push(`${field} = NULL`);
+            } else if (data[field] !== undefined) {
                 setClauses.push(`${field} = ?`);
                 values.push(data[field]);
             }

@@ -8,7 +8,7 @@ const DAYS_TO_HARD_DELETE_REVIEWS = 15;
 const startReviewCleanupJob = () => {
     // Lịch chạy cron: mỗi ngày vào lúc 00:00 (nửa đêm)
     // Hoặc mỗi phút trong quá trình dev để dễ test: '* * * * *'
-    cron.schedule('* * * * *', async () => { // Chạy vào 00:00 mỗi ngày
+    cron.schedule('0 0 * * *', async () => { // Chạy vào 00:00 mỗi ngày
         console.log(`[CRON JOB] Bắt đầu quét đánh giá để xóa cứng (sau ${DAYS_TO_HARD_DELETE_REVIEWS} ngày)...`);
         const connection = await db.getConnection(); // Lấy một connection riêng cho cron job
         try {
