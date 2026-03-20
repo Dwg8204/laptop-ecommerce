@@ -5,6 +5,7 @@ const { swaggerUi, swaggerSpec } = require('./config/swagger');
 const path = require('path');
 const http = require('http');
 const { initRealtime } = require('./socket/realtime');
+const { startReviewCleanupJob } = require('./cronJobs/reviewCleanupJob');
 
 const app = express();
 const corsOrigin = process.env.FRONTEND_ORIGIN
@@ -36,6 +37,7 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 app.use('/api/sliders', sliderRoutes);
 app.use('/api/auth', authRoutes);
@@ -51,6 +53,7 @@ app.use('/api/product-categories', productCategoryRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/reviews', reviewRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Cho phép truy cập trực tiếp vào thư mục uploads qua URL
 app.use('/api/notifications', notificationRoutes);
 // Global error handler: luôn trả JSON thay vì HTML error page.
@@ -80,4 +83,5 @@ initRealtime(server);
 
 server.listen(process.env.PORT || 5000, () => {
     console.log(`🚀 Server đang chạy tại port ${process.env.PORT || 5000}`);
+    startReviewCleanupJob();
 });
