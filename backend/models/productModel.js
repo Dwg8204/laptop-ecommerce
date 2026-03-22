@@ -66,7 +66,21 @@ const Product = {
                     WHERE pv5.product_id = p.product_id
                     ORDER BY (pv5.discount_price IS NULL), pv5.discount_price, pv5.original_price ASC
                     LIMIT 1
-                ) AS representative_storage_gb
+                ) AS representative_storage_gb,
+                (
+                    SELECT pv6.original_price
+                    FROM product_variants pv6
+                    WHERE pv6.product_id = p.product_id
+                    ORDER BY (pv6.discount_price IS NULL), pv6.discount_price, pv6.original_price ASC
+                    LIMIT 1
+                ) AS representative_original_price,
+                (
+                    SELECT pv7.discount_price
+                    FROM product_variants pv7
+                    WHERE pv7.product_id = p.product_id
+                    ORDER BY (pv7.discount_price IS NULL), pv7.discount_price, pv7.original_price ASC
+                    LIMIT 1
+                ) AS representative_discount_price
             FROM products p
             LEFT JOIN brands b ON p.brand_id = b.brand_id
             LEFT JOIN categories c ON p.category_id = c.category_id

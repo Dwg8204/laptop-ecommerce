@@ -27,6 +27,14 @@ const UserAddress = {
         return rows;
     },
 
+    clearDefaultByUserId: async (userId) => {
+        const [result] = await db.query(
+            'UPDATE user_addresses SET is_default = FALSE WHERE user_id = ?',
+            [userId]
+        );
+        return result.affectedRows;
+    },
+
     /**
      * Thêm địa chỉ mới cho người dùng.
      * @param {Object} addressData - Dữ liệu địa chỉ (user_id, receiver_name, receiver_phone, specific_address, ward, district, province, is_default).

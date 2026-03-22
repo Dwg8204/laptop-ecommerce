@@ -38,6 +38,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const userProfileRoutes = require('./routes/userProfileRoutes');
 
 app.use('/api/sliders', sliderRoutes);
 app.use('/api/auth', authRoutes);
@@ -54,6 +55,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/profile', userProfileRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Cho phép truy cập trực tiếp vào thư mục uploads qua URL
 app.use('/api/notifications', notificationRoutes);
 // Global error handler: luôn trả JSON thay vì HTML error page.

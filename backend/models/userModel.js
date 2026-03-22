@@ -39,6 +39,16 @@ const User = {
         return result.affectedRows;
     },
 
+    // Cập nhật thông tin hồ sơ người dùng
+    updateProfile: async (userId, profileData) => {
+        const { full_name, phone_number } = profileData;
+        const [result] = await pool.execute(
+            'UPDATE users SET full_name = ?, phone_number = ? WHERE user_id = ?',
+            [full_name, phone_number, userId]
+        );
+        return result.affectedRows;
+    },
+
     // Gán role cho user (mặc định là customer)
     assignRole: async (userId, roleId = 3) => {
         await pool.execute(

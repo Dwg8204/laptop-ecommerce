@@ -4,6 +4,19 @@ import { useProducts } from "../context/ProductContext"
 import { useCart } from "../context/CartContext"
 import { FiShoppingCart } from "react-icons/fi"
 
+const getDiscountLabel = (item) => {
+  if (item?.discount) return item.discount
+
+  const currentPrice = Number(item?.price || 0)
+  const originalPrice = Number(item?.oldPrice || 0)
+  if (currentPrice > 0 && originalPrice > currentPrice) {
+    const percent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
+    return percent > 0 ? `Giảm ${percent}%` : ''
+  }
+
+  return ''
+}
+
 export default function ProductListSection({ filters, sortBy, selectedCategory = '' }) {
   const navigate = useNavigate()
   const { products, loading } = useProducts()
@@ -129,6 +142,10 @@ export default function ProductListSection({ filters, sortBy, selectedCategory =
              style={{ cursor: "pointer" }}
              >
               {(() => {
+                const discountLabel = getDiscountLabel(item)
+                return discountLabel ? <div className="badge-left">{discountLabel}</div> : null
+              })()}
+              {(() => {
                 const percent = Math.min(100, Math.round((item.sold / item.stock) * 100))
                 const remain = Math.max(0, item.stock - item.sold)
                 return (
@@ -148,7 +165,6 @@ export default function ProductListSection({ filters, sortBy, selectedCategory =
               })()}
               
               {/* Top badges */}
-              <div className="badge-left">{item.discount}</div>
               <div className="badge-right">{item.installment}</div>
 
               {/* Image */}

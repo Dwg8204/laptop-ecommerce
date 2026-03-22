@@ -1,0 +1,161 @@
+.profile-page {
+  padding: 24px;
+  background: linear-gradient(160deg, #f7f9fc 0%, #edf2fb 100%);
+  min-height: calc(100vh - 180px);
+}
+
+.profile-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+.profile-subtitle {
+  margin-top: -8px;
+  color: #52607a;
+}
+
+.profile-card {
+  background: #ffffff;
+  border: 1px solid #dbe4f5;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(25, 45, 86, 0.06);
+}
+
+.profile-form {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profile-form label {
+  display: grid;
+  gap: 6px;
+  color: #1f2a44;
+  font-size: 14px;
+}
+
+.profile-form input {
+  border: 1px solid #c8d3ea;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.profile-form input:focus {
+  border-color: #2f4b81;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 75, 129, 0.14);
+}
+
+.profile-form button {
+  width: fit-content;
+  border: none;
+  border-radius: 10px;
+  background: #1e3764;
+  color: #fff;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.profile-form .btn-secondary,
+.address-actions button {
+  background: #eef2fb;
+  color: #24385f;
+  border: 1px solid #d2dced;
+}
+
+.profile-form .btn-danger,
+.address-actions .btn-danger {
+  background: #fee2e2;
+  color: #8e1f1f;
+  border: 1px solid #fecaca;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profile-span-2 {
+  grid-column: span 2;
+}
+
+.profile-checkbox {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-checkbox input {
+  width: 16px;
+  height: 16px;
+}
+
+.address-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.address-item {
+  border: 1px solid #d4def1;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f9fbff;
+}
+
+.address-item header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.address-default {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #0f766e;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.address-item p {
+  margin: 3px 0;
+  color: #344564;
+}
+
+.address-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.address-actions button {
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .profile-page {
+    padding: 14px;
+  }
+
+  .profile-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-span-2 {
+    grid-column: span 1;
+  }
+}

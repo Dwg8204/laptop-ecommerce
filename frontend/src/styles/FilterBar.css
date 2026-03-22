@@ -14,8 +14,8 @@
 }
 
 .sort-title, .filter-title {
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
   margin: 0;
   white-space: nowrap;
 }
@@ -27,6 +27,7 @@
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -54,7 +55,8 @@
   border: 1px solid #ccc;
   border-radius: 8px;
   padding: 10px 16px;
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
   display: flex;
@@ -92,7 +94,7 @@
 
 .filter-count {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .filter-btn svg.rotate {
@@ -157,6 +159,7 @@
 
 .filter-option span {
   font-size: 14px;
+  font-weight: 400;
   color: #333;
 }
 
@@ -171,7 +174,8 @@
   border: 1px solid #ccc;
   border-radius: 8px;
   padding: 8px 18px;
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;

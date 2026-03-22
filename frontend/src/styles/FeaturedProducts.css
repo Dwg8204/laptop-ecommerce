@@ -31,7 +31,7 @@
 .featured-title {
   text-align: center;
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 900;
   margin-bottom: 30px;
   letter-spacing: 1px;
 }
@@ -41,11 +41,10 @@
 }
 
 .product-list {
-  display: flex;
-  gap: 24px;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding-bottom: 10px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
 }
 
 .product-list::-webkit-scrollbar {
@@ -53,7 +52,7 @@
 }
 
 .product-card {
-  min-width: 260px;
+  min-width: 0;
   background: white;
   color: black;
   border-radius: 12px;
@@ -62,6 +61,19 @@
   text-align: center;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   transition: transform 0.2s;
+}
+
+.prod-name {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  min-height: 38px;
+  margin: 6px 0;
+}
+
+.rating {
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .featured-stock-wrap {
@@ -140,6 +152,7 @@
 .spec {
   font-size: 12px;
   color: #e30019;
+  font-weight: 500;
   margin: 6px 0 4px;
 }
 
@@ -149,7 +162,7 @@
 
 .new {
   color: red;
-  font-weight: bold;
+  font-weight: 700;
   margin-right: 10px;
 }
 
@@ -157,6 +170,7 @@
   text-decoration: line-through;
   color: gray;
   font-size: 14px;
+  font-weight: 400;
 }
 
 .favorite {
@@ -165,6 +179,7 @@
   color: #007bff;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .nav-btn {
@@ -186,4 +201,46 @@
 
 .right {
   right: -15px;
+}
+
+@media (max-width: 1200px) {
+  .product-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .nav-btn {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .featured-wrapper {
+    margin: 16px 0;
+    padding: 22px 14px;
+    border-radius: 16px;
+  }
+
+  .featured-title {
+    font-size: 24px;
+    margin-bottom: 18px;
+  }
+
+  .product-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .product-card {
+    padding: 12px;
+  }
+
+  .product-card img {
+    height: 130px;
+  }
+}
+
+@media (max-width: 560px) {
+  .product-list {
+    grid-template-columns: 1fr;
+  }
 }

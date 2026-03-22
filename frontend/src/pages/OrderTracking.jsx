@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FiPackage, FiTruck, FiCheckCircle, FiArrowLeft, FiCalendar, FiMapPin } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
 import * as orderApi from '../services/orderApiEnhanced'
+import * as userProfileApi from '../services/userProfileApi'
 //import { readOrdersForUser } from '../lib/orderStorage'
 import '../styles/OrderTracking.css'
 
@@ -11,49 +12,109 @@ export default function OrderTracking() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState(null)
+  const [userAddresses, setUserAddresses] = useState([])
+  const [newAddressId, setNewAddressId] = useState('')
+  const [updatingAddress, setUpdatingAddress] = useState(false)
+  const [addressMessage, setAddressMessage] = useState('')
   const mapBackendStatus = (status) => {
-  const map = {
-    PENDING_CONFIRMATION: 'cho-xac-nhan',
-    PROCESSING: 'dang-xu-ly',
-    SHIPPING: 'dang-giao',
-    COMPLETED: 'hoan-thanh',
-    CANCELLED: 'da-huy',
+    const map = {
+      PENDING_CONFIRMATION: 'cho-xac-nhan',
+      WAITING_FOR_STOCK: 'cho-co-hang',
+      PROCESSING: 'dang-xu-ly',
+      SHIPPING: 'dang-giao',
+      COMPLETED: 'hoan-thanh',
+      CANCELLED: 'da-huy',
+    }
+    return map[status] || 'cho-xac-nhan'
   }
-  return map[status] || 'cho-xac-nhan'
-}
+
+  const loadOrders = async (currentUserId) => {
+    const res = await orderApi.getOrders({ user_id: currentUserId })
+    const list = Array.isArray(res?.data) ? res.data : []
+
+    const mapped = list.map(order => ({
+      id: order.order_id,
+      backendStatus: order.status,
+      customer: order.customer_name,
+      total: Number(order.total_amount || 0),
+      status: mapBackendStatus(order.status),
+      date: order.order_date
+        ? new Date(order.order_date).toLocaleDateString('vi-VN')
+        : '',
+      preOrder: order.order_type === 'PRE_ORDER',
+      addressText: [order.specific_address, order.ward, order.district, order.province].filter(Boolean).join(', '),
+    }))
+
+    setOrders(mapped)
+    setSelectedOrder((previous) => {
+      if (!mapped.length) return null
+      if (previous) {
+        const matched = mapped.find(item => item.id === previous.id)
+        if (matched) return matched
+      }
+      return mapped[0]
+    })
+  }
 
   useEffect(() => {
-  const fetchOrders = async () => {
-    if (!user?.user_id) {
-      setOrders([])
-      setSelectedOrder(null)
-      return
+    const fetchOrders = async () => {
+      if (!user?.user_id) {
+        setOrders([])
+        setSelectedOrder(null)
+        return
+      }
+
+      try {
+        await loadOrders(user.user_id)
+      } catch (err) {
+        console.error('Error loading orders:', err)
+      }
     }
 
-    try {
-      const res = await orderApi.getOrders({ user_id: user.user_id })
-      const list = Array.isArray(res?.data) ? res.data : []
+    fetchOrders()
+  }, [user])
 
-      const mapped = list.map(order => ({
-        id: order.order_id,
-        customer: order.customer_name,
-        total: Number(order.total_amount || 0),
-        status: mapBackendStatus(order.status), // 🔥 map lại status
-        date: order.order_date
-          ? new Date(order.order_date).toLocaleDateString('vi-VN')
-          : '',
-        preOrder: order.order_type === "PRE_ORDER",
-      }))
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      if (!user?.user_id) {
+        setUserAddresses([])
+        return
+      }
 
-      setOrders(mapped)
-      setSelectedOrder(mapped[0] || null)
-    } catch (err) {
-      console.error("Error loading orders:", err)
+      try {
+        const res = await userProfileApi.getMyAddresses()
+        const addresses = Array.isArray(res?.data) ? res.data : []
+        setUserAddresses(addresses)
+      } catch (error) {
+        console.error('Error loading addresses:', error)
+      }
     }
-  }
 
-  fetchOrders()
-}, [user])
+    fetchAddresses()
+  }, [user])
+
+  useEffect(() => {
+    const fetchOrderDetail = async () => {
+      if (!selectedOrder?.id) {
+        setSelectedOrderDetail(null)
+        setNewAddressId('')
+        setAddressMessage('')
+        return
+      }
+
+      try {
+        const res = await orderApi.getOrderById(selectedOrder.id)
+        const detail = res?.data || null
+        setSelectedOrderDetail(detail)
+        setNewAddressId(detail?.address_id ? String(detail.address_id) : '')
+      } catch (error) {
+        console.error('Error loading order detail:', error)
+      }
+    }
+
+    fetchOrderDetail()
+  }, [selectedOrder?.id])
 
   const getTrackingSteps = (order) => {
     const steps = [
@@ -89,6 +150,7 @@ export default function OrderTracking() {
   const getStatusBadgeColor = (status) => {
     const colors = {
       'cho-xac-nhan': 'status-pending',
+      'cho-co-hang': 'status-waiting-stock',
       'dang-xu-ly': 'status-preparing',
       'dang-giao': 'status-shipping',
       'hoan-thanh': 'status-completed',
@@ -100,6 +162,7 @@ export default function OrderTracking() {
   const getStatusLabel = (status) => {
     const labels = {
       'cho-xac-nhan': 'Chờ xác nhận',
+      'cho-co-hang': 'Chờ có hàng',
       'dang-xu-ly': 'Đang chuẩn bị',
       'dang-giao': 'Đang giao',
       'hoan-thanh': 'Đã nhận',
@@ -109,6 +172,46 @@ export default function OrderTracking() {
   }
 
   const toCurrency = (value) => `${value.toLocaleString('vi-VN')}đ`
+
+  const formatAddress = (order) => {
+    if (!order) return 'Chưa có địa chỉ giao hàng.'
+    const parts = [order.specific_address, order.ward, order.district, order.province].filter(Boolean)
+    return parts.length ? parts.join(', ') : 'Chưa có địa chỉ giao hàng.'
+  }
+
+  const canUpdateAddress = selectedOrderDetail
+    ? ['PENDING_CONFIRMATION', 'WAITING_FOR_STOCK'].includes(selectedOrderDetail.status)
+    : ['PENDING_CONFIRMATION', 'WAITING_FOR_STOCK'].includes(selectedOrder?.backendStatus)
+
+  const handleUpdateOrderAddress = async () => {
+    if (!selectedOrder?.id || !newAddressId || !user?.user_id) {
+      setAddressMessage('Vui lòng chọn địa chỉ hợp lệ trước khi cập nhật.')
+      return
+    }
+
+    try {
+      setUpdatingAddress(true)
+      setAddressMessage('')
+
+      await orderApi.updateOrderAddress(selectedOrder.id, {
+        user_id: Number(user.user_id),
+        address_id: Number(newAddressId),
+      })
+
+      setAddressMessage('Đã cập nhật địa chỉ giao hàng cho đơn.')
+      await Promise.all([
+        loadOrders(user.user_id),
+        orderApi.getOrderById(selectedOrder.id).then((res) => {
+          const detail = res?.data || null
+          setSelectedOrderDetail(detail)
+        }),
+      ])
+    } catch (error) {
+      setAddressMessage(error.message || 'Không thể cập nhật địa chỉ giao hàng.')
+    } finally {
+      setUpdatingAddress(false)
+    }
+  }
 
   return (
     <div className="ot-container">
@@ -186,6 +289,53 @@ export default function OrderTracking() {
                     <label>Ngày đặt</label>
                     <p><FiCalendar size={14} style={{ marginRight: '4px' }} /> {selectedOrder.date || new Date().toLocaleDateString('vi-VN')}</p>
                   </div>
+                  <div className="ot-info-item ot-info-item-full">
+                    <label>Địa chỉ giao hàng</label>
+                    <p><FiMapPin size={14} style={{ marginRight: '4px' }} /> {formatAddress(selectedOrderDetail || selectedOrder)}</p>
+                    {selectedOrderDetail?.receiver_name && (
+                      <small>Người nhận: {selectedOrderDetail.receiver_name} - {selectedOrderDetail.receiver_phone}</small>
+                    )}
+                  </div>
+                </div>
+
+                <div className="ot-shipping-address-card">
+                  <h3>Thông tin giao hàng</h3>
+                  {canUpdateAddress ? (
+                    <>
+                      <p className="ot-shipping-note">Bạn có thể đổi địa chỉ khi đơn chưa vào trạng thái xử lý.</p>
+                      <div className="ot-address-edit-row">
+                        <select
+                          className="ot-address-select"
+                          value={newAddressId}
+                          onChange={(e) => setNewAddressId(e.target.value)}
+                          disabled={updatingAddress || userAddresses.length === 0}
+                        >
+                          <option value="">Chọn địa chỉ giao hàng</option>
+                          {userAddresses.map((address) => (
+                            <option key={address.address_id} value={address.address_id}>
+                              {`${address.receiver_name} - ${address.receiver_phone} - ${[address.specific_address, address.ward, address.district, address.province].filter(Boolean).join(', ')}`}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="ot-btn ot-btn-primary"
+                          type="button"
+                          disabled={updatingAddress || !newAddressId}
+                          onClick={handleUpdateOrderAddress}
+                        >
+                          {updatingAddress ? 'Đang cập nhật...' : 'Đổi địa chỉ'}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="ot-shipping-note">Đơn đã vào xử lý hoặc đang giao, không thể đổi địa chỉ.</p>
+                  )}
+
+                  {!!addressMessage && (
+                    <p className={`ot-address-message ${addressMessage.startsWith('Đã') ? 'success' : 'error'}`}>
+                      {addressMessage}
+                    </p>
+                  )}
                 </div>
 
                 {/* Timeline */}

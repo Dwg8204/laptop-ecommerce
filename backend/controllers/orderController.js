@@ -221,6 +221,65 @@ const orderController = {
     },
 
     /**
+     * API: Cập nhật địa chỉ giao hàng cho đơn (PUT /api/orders/:id/address)
+     * Chỉ cho phép khi đơn chưa vào PROCESSING.
+     * req.body: { user_id: number, address_id: number }
+     */
+    updateOrderAddress: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { user_id, address_id } = req.body;
+
+            if (!isValidOrderId(id)) {
+                return res.status(400).json({ success: false, message: 'ID đơn hàng không hợp lệ.' });
+            }
+
+            if (!isValidId(user_id)) {
+                return res.status(400).json({ success: false, message: 'ID người dùng không hợp lệ.' });
+            }
+
+            if (!isValidId(address_id)) {
+                return res.status(400).json({ success: false, message: 'ID địa chỉ không hợp lệ.' });
+            }
+
+            const connection = await db.getConnection();
+            try {
+                await connection.beginTransaction();
+
+                const affectedRows = await Order.updateOrderAddress(
+                    parseInt(id, 10),
+                    parseInt(user_id, 10),
+                    parseInt(address_id, 10),
+                    connection
+                );
+
+                if (affectedRows === 0) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Không thể cập nhật địa chỉ giao hàng cho đơn hàng này.'
+                    });
+                }
+
+                await connection.commit();
+                res.status(200).json({
+                    success: true,
+                    message: 'Cập nhật địa chỉ giao hàng thành công.',
+                    data: { order_id: parseInt(id, 10), address_id: parseInt(address_id, 10) }
+                });
+            } catch (error) {
+                await connection.rollback();
+                throw error;
+            } finally {
+                connection.release();
+            }
+        } catch (error) {
+            console.error('Lỗi khi cập nhật địa chỉ đơn hàng:', error.message);
+            res.status(500).json({ success: false, message: error.message || 'Lỗi máy chủ nội bộ khi cập nhật địa chỉ đơn hàng' });
+        }
+    },
+
+    /**
      * API: Hủy đơn hàng (DELETE /api/orders/:id/cancel)
      * Dành cho khách hàng với các điều kiện riêng và Admin
      */

@@ -8,7 +8,7 @@ import * as productApi from "../services/productApi"
 import * as orderApi from "../services/orderApi"
 import * as inventoryApi from "../services/inventoryApi"
 import * as adminApi from "../services/adminApi"
-import { buildApiUrl } from "../config/api"
+import { buildApiUrl, getImageUrl } from "../config/api"
 import { getAuthToken } from "../lib/authToken"
 import {
   FiBarChart2,
@@ -45,11 +45,13 @@ import AdminSliderAPI from "../components/admin/AdminSliderAPI"
 import AdminBranch from "../components/admin/AdminBranch"
 import AdminVouchers from "../components/admin/AdminVouchers"
 import AdminNotifications from "../components/admin/AdminNotifications"
+import AdminCategories from "../components/admin/AdminCategories"
 
 const moduleItems = [
   { id: "dashboard", label: "Dashboard", icon: FiBarChart2 },
   { id: "products", label: "Sản phẩm", icon: FiPackage },
   { id: "branch", label: "Quản lý thương hiệu", icon: FiList },
+  { id: "categories", label: "Quản lý danh mục sản phẩm", icon: FiLayers },
   { id: "inventory", label: "Tồn kho", icon: FiBox },
   { id: "orders", label: "Đơn hàng", icon: FiClipboard },
   { id: "vouchers", label: "Voucher", icon: FiGift },
@@ -73,6 +75,71 @@ const initialStaff = [
   { id: "S002", name: "Nhân viên hệ thống", role: "staff", email: "staff@laptopshop.vn" },
 ]
 
+const createEmptyProductForm = () => ({
+  name: "",
+  sku: "",
+  color: "",
+  brand: "",
+  brand_id: "",
+  price: "",
+  oldPrice: "",
+  storage: "",
+  ram: "",
+  ramType: "",
+  cpu: "",
+  screenSize: "",
+  weightKg: "",
+  os: "",
+  graphics: "",
+  features: [],
+  description: "",
+  highlightFeatures: "",
+  hasAI: false,
+  series: "",
+  category_id: "",
+  stock: "",
+  image: "",
+  imageFiles: [],
+  imagePreviews: [],
+  discount: "",
+  installment: "Trả góp 0%",
+  newArrival: false,
+})
+
+const createEmptyVariantForm = () => ({
+  sku: "",
+  cpu: "",
+  gpu: "",
+  ram: "",
+  ramType: "",
+  storage: "",
+  color: "",
+  originalPrice: "",
+  discountPrice: "",
+  stock: "",
+  status: "IN_STOCK",
+  imageFiles: [],
+  imagePreviews: [],
+})
+
+const splitFeatures = (value) => {
+  if (!value) return []
+  return String(value)
+    .split(/\r?\n|,|•/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+const getVariantStatus = (stock, currentStatus) => {
+  if (currentStatus) return currentStatus
+  return Number(stock || 0) > 0 ? "IN_STOCK" : "OUT_OF_STOCK"
+}
+
+const getPreferredVariant = (variants = []) => {
+  if (!Array.isArray(variants) || variants.length === 0) return null
+  return variants.find((variant) => variant.status !== "DISCONTINUED") || variants[0]
+}
+
 export default function Admin() {
   const { user, loading, isAdmin } = useAuth()
   const navigate = useNavigate()
@@ -80,69 +147,17 @@ export default function Admin() {
   const [activeModule, setActiveModule] = useState("dashboard")
 
   const { products, addProduct, addVariantToProduct, updateVariantInProduct, removeVariantFromProduct, updateProduct, deleteProduct } = useProducts()
-  
-  const [selectedOrder, setSelectedOrder] = useState(null)
-  
 
-  const [productForm, setProductForm] = useState({
-    name: "",
-    version: "",
-    brand: "",
-    brand_id: "",
-    price: "",
-    oldPrice: "",
-    storage: "",
-    ram: "",
-    ramType: "",
-    cpu: "",
-    screenSize: "",
-    weightKg: "",
-    os: "",
-    graphics: "",
-    features: [],
-    hasAI: false,
-    series: "",
-    category_id: "",
-    stock: "",
-    image: "",
-    imageFiles: [],
-    imagePreviews: [],
-    discount: "",
-    installment: "Trả góp 0%",
-    newArrival: false,
-  })
+  const [selectedOrder, setSelectedOrder] = useState(null)
+
+
+  const [productForm, setProductForm] = useState(createEmptyProductForm())
   const [editingProductId, setEditingProductId] = useState("")
   const [productVariants, setProductVariants] = useState([])
   const [editingVariantIndex, setEditingVariantIndex] = useState(-1)
-  const [variantForm, setVariantForm] = useState({
-    sku: "",
-    cpu: "",
-    gpu: "",
-    ram: "",
-    ramType: "",
-    storage: "",
-    color: "",
-    originalPrice: "",
-    discountPrice: "",
-    stock: "",
-    imageFiles: [],
-    imagePreviews: [],
-  })
+  const [variantForm, setVariantForm] = useState(createEmptyVariantForm())
 
-  const emptyVariantForm = {
-    sku: "",
-    cpu: "",
-    gpu: "",
-    ram: "",
-    ramType: "",
-    storage: "",
-    color: "",
-    originalPrice: "",
-    discountPrice: "",
-    stock: "",
-    imageFiles: [],
-    imagePreviews: [],
-  }
+  const emptyVariantForm = createEmptyVariantForm()
 
   const [inventory, setInventory] = useState([])
   const [stockForm, setStockForm] = useState({ variantId: "", supplierName: "", quantity: "", unitImportPrice: "" })
@@ -163,7 +178,7 @@ export default function Admin() {
   const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "", password: "", role: "staff" })
   const [searchTerm, setSearchTerm] = useState("")
   const [loadingStaff, setLoadingStaff] = useState(false)
-  
+
   // Brands and Categories for product form
   const [brands, setBrands] = useState([])
   const [categories, setCategories] = useState([])
@@ -182,6 +197,21 @@ export default function Admin() {
     fetchBrandsAndCategories()
   }, [])
 
+  const loadCategories = async () => {
+    try {
+      setLoadingCategories(true)
+      const categoriesResponse = await categoryApi.getAllCategories()
+      if (categoriesResponse.success && categoriesResponse.data) {
+        setCategories(categoriesResponse.data)
+      }
+    } catch (error) {
+      console.error("Error fetching categories:", error)
+      throw error
+    } finally {
+      setLoadingCategories(false)
+    }
+  }
+
   const fetchBrandsAndCategories = async () => {
     // Fetch brands
     try {
@@ -197,17 +227,25 @@ export default function Admin() {
     }
 
     // Fetch categories
-    try {
-      setLoadingCategories(true)
-      const categoriesResponse = await categoryApi.getAllCategories()
-      if (categoriesResponse.success && categoriesResponse.data) {
-        setCategories(categoriesResponse.data)
-      }
-    } catch (error) {
-      console.error("Error fetching categories:", error)
-    } finally {
-      setLoadingCategories(false)
-    }
+    await loadCategories()
+  }
+
+  const createCategory = async (payload) => {
+    const response = await categoryApi.createCategory(payload)
+    await loadCategories()
+    return response
+  }
+
+  const updateCategory = async (categoryId, payload) => {
+    const response = await categoryApi.updateCategory(categoryId, payload)
+    await loadCategories()
+    return response
+  }
+
+  const deleteCategory = async (categoryId) => {
+    const response = await categoryApi.deleteCategory(categoryId)
+    await loadCategories()
+    return response
   }
 
   const fetchStaffUsers = async () => {
@@ -340,14 +378,14 @@ export default function Admin() {
   }, [activeModule])
 
   const lowStockItems = useMemo(() => inventory, [inventory])
-  
+
   const filteredProducts = useMemo(() => {
     if (!searchTerm.trim()) return products
     return products.filter((product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.series.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.id.toLowerCase().includes(searchTerm.toLowerCase())
+      String(product.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(product.brand || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(product.series || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(product.id || "").toLowerCase().includes(searchTerm.toLowerCase())
     )
   }, [products, searchTerm])
 
@@ -384,7 +422,9 @@ export default function Admin() {
   }, [aiLogs])
 
   const handleProductSubmit = async (event) => {
-    event.preventDefault()
+    if (event?.preventDefault) {
+      event.preventDefault()
+    }
 
     // Validate brand and category selection
     if (!productForm.brand_id || productForm.brand_id === '') {
@@ -399,16 +439,46 @@ export default function Admin() {
       alert('Vui lòng upload hình ảnh sản phẩm')
       return
     }
-    if (!editingProductId && productVariants.length === 0) {
-      alert('Vui lòng thêm ít nhất một phiên bản cho sản phẩm')
-      return
+
+    let workingVariants = [...productVariants]
+
+    if (!editingProductId && workingVariants.length === 0) {
+      const normalizedSku = String(productForm.sku || '').trim()
+      if (!normalizedSku) {
+        alert('Vui lòng nhập SKU cho sản phẩm mới')
+        return
+      }
+
+      const originalPriceValue = Number(productForm.oldPrice || productForm.price || 0)
+      const discountPriceValue = productForm.price ? Number(productForm.price) : null
+      const hasValidDiscount = discountPriceValue && discountPriceValue > 0 && originalPriceValue > discountPriceValue
+
+      workingVariants = [
+        {
+          sku: normalizedSku,
+          color: String(productForm.color || '').trim() || 'Mặc định',
+          cpu: productForm.cpu || 'Đang cập nhật',
+          gpu: productForm.graphics || 'Đang cập nhật',
+          ram: productForm.ram || '8',
+          ramType: productForm.ramType || 'DDR4',
+          storage: productForm.storage || '256',
+          originalPrice: originalPriceValue,
+          discountPrice: hasValidDiscount ? discountPriceValue : null,
+          stock: Number(productForm.stock || 0),
+          status: getVariantStatus(productForm.stock),
+          imageFiles: Array.isArray(productForm.imageFiles) ? productForm.imageFiles : [],
+          imagePreviews: Array.isArray(productForm.imagePreviews) ? productForm.imagePreviews : [],
+        },
+      ]
     }
-    if (!editingProductId && productVariants.some((variant) => !variant.imageFiles || variant.imageFiles.length === 0)) {
+
+    if (!editingProductId && workingVariants.some((variant) => !variant.imageFiles || variant.imageFiles.length === 0)) {
       alert('Mỗi phiên bản sản phẩm phải có tối thiểu 1 ảnh')
       return
     }
 
-    const firstVariant = productVariants[0]
+    const representativeVariantIndex = workingVariants.findIndex((variant) => variant.status !== "DISCONTINUED")
+    const firstVariant = representativeVariantIndex >= 0 ? workingVariants[representativeVariantIndex] : workingVariants[0]
     const basePrice = firstVariant ? Number(firstVariant.discountPrice || firstVariant.originalPrice || 0) : Number(productForm.price)
     const baseOldPrice = firstVariant ? Number(firstVariant.originalPrice || firstVariant.discountPrice || 0) : Number(productForm.oldPrice || productForm.price)
     const baseRam = firstVariant?.ram || productForm.ram
@@ -416,23 +486,48 @@ export default function Admin() {
     const baseStorage = firstVariant?.storage || productForm.storage
     const baseCpu = firstVariant?.cpu || productForm.cpu
     const baseGraphics = firstVariant?.gpu || productForm.graphics
-    const baseVersion = firstVariant?.color || productForm.version
     const baseStock = firstVariant ? Number(firstVariant.stock || 0) : Number(productForm.stock)
 
     const autoConfig = `${baseRam}${baseRamType ? ` ${baseRamType}` : ""} | ${baseStorage} | ${productForm.screenSize}`
     const autoSpecs = `${baseCpu} | ${baseGraphics} | ${productForm.os}${productForm.weightKg ? ` | ${productForm.weightKg} kg` : ""}`
 
+    const normalizedVariants = workingVariants.map((variant, index) => {
+      if (index !== (representativeVariantIndex >= 0 ? representativeVariantIndex : 0)) {
+        return {
+          ...variant,
+          status: getVariantStatus(variant.stock, variant.status),
+        }
+      }
+
+      return {
+        ...variant,
+        cpu: productForm.cpu || variant.cpu,
+        gpu: productForm.graphics || variant.gpu,
+        color: productForm.color || variant.color,
+        ram: productForm.ram || variant.ram,
+        ramType: productForm.ramType || variant.ramType,
+        storage: productForm.storage || variant.storage,
+        originalPrice: Number(productForm.oldPrice || variant.originalPrice || 0) || variant.originalPrice,
+        discountPrice: productForm.price ? Number(productForm.price) : variant.discountPrice,
+        stock: productForm.stock !== "" ? Number(productForm.stock) : variant.stock,
+        status: getVariantStatus(productForm.stock !== "" ? Number(productForm.stock) : variant.stock, variant.status),
+      }
+    })
+
     const payload = {
       name: productForm.name,
+      sku: productForm.sku,
+      color: productForm.color,
       brand: productForm.brand,
       brand_id: productForm.brand_id, // Pass brand_id for API
       category_id: productForm.category_id, // Pass category_id for API
+      description: productForm.description,
+      highlightFeatures: productForm.highlightFeatures,
       price: basePrice,
       oldPrice: baseOldPrice,
       storage: baseStorage,
       ram: baseRam,
       ramType: baseRamType,
-      version: baseVersion,
       cpu: baseCpu,
       screenSize: productForm.screenSize,
       weightKg: productForm.weightKg,
@@ -451,8 +546,8 @@ export default function Admin() {
       installment: productForm.installment,
       newArrival: productForm.newArrival,
       productImages: productForm.imageFiles,
-      variantImages: productVariants.map((variant) => variant.imageFiles || []),
-      productVariants,
+      variantImages: normalizedVariants.map((variant) => variant.imageFiles || []),
+      productVariants: normalizedVariants,
     }
 
     try {
@@ -463,36 +558,10 @@ export default function Admin() {
       }
 
       // Clear form on success
-      setProductForm({
-        name: "",
-        version: "",
-        brand: "",
-        brand_id: "",
-        price: "",
-        oldPrice: "",
-        storage: "",
-        ram: "",
-        ramType: "",
-        cpu: "",
-        screenSize: "",
-        weightKg: "",
-        os: "",
-        graphics: "",
-        features: [],
-        hasAI: false,
-        series: "",
-        category_id: "",
-        stock: "",
-        image: "",
-        imageFiles: [],
-        imagePreviews: [],
-        discount: "",
-        installment: "Trả góp 0%",
-        newArrival: false,
-      })
+      setProductForm(createEmptyProductForm())
       setProductVariants([])
       setEditingVariantIndex(-1)
-      setVariantForm(emptyVariantForm)
+      setVariantForm(createEmptyVariantForm())
       setEditingProductId("")
     } catch (error) {
       console.error('Error submitting product:', error)
@@ -516,6 +585,7 @@ export default function Admin() {
       originalPrice: Number(variantForm.originalPrice),
       discountPrice: variantForm.discountPrice ? Number(variantForm.discountPrice) : null,
       stock: Number(variantForm.stock || 0),
+      status: getVariantStatus(variantForm.stock, variantForm.status),
     }
 
     if (editingVariantIndex >= 0) {
@@ -556,13 +626,13 @@ export default function Admin() {
       setProductVariants((prev) => [...prev, newVariant])
     }
 
-    setVariantForm(emptyVariantForm)
+    setVariantForm(createEmptyVariantForm())
   }
 
   const handleEditVariant = (index) => {
     setEditingVariantIndex(index)
     setVariantForm({
-      sku: "",
+      ...createEmptyVariantForm(),
       ...productVariants[index],
     })
   }
@@ -585,7 +655,7 @@ export default function Admin() {
     setProductVariants((prev) => prev.filter((_, i) => i !== index))
     if (editingVariantIndex === index) {
       setEditingVariantIndex(-1)
-      setVariantForm(emptyVariantForm)
+      setVariantForm(createEmptyVariantForm())
     } else if (editingVariantIndex > index) {
       setEditingVariantIndex((prev) => prev - 1)
     }
@@ -593,40 +663,49 @@ export default function Admin() {
 
   const handleEditProduct = async (product) => {
     setEditingProductId(product.id)
-    setProductForm({
-      name: product.name,
-      brand_id: product.brand_id || "",
-      category_id: product.category_id || "",
-      brand: product.brand,
-      price: String(product.price),
-      oldPrice: String(product.oldPrice || product.price),
-      storage: product.storage,
-      ram: product.ram,
-      ramType: product.ramType || "",
-      version: product.version || "",
-      cpu: product.cpu,
-      screenSize: product.screenSize,
-      weightKg: product.weightKg || "",
-      os: product.os || "",
-      graphics: product.graphics,
-      features: product.features || [],
-      hasAI: product.hasAI || false,
-      series: product.series,
-      stock: String(product.stock),
-      image: product.image,
-      imageFiles: [],
-      imagePreviews: product.image ? [product.image] : [],
-      discount: product.discount,
-      installment: product.installment || "Trả góp 0%",
-      newArrival: product.newArrival || false,
-    })
     setProductVariants([])
     setEditingVariantIndex(-1)
-    setVariantForm(emptyVariantForm)
+    setVariantForm(createEmptyVariantForm())
 
     try {
       const detailResponse = await productApi.getProductById(product.id)
       const productDetail = detailResponse?.data
+      const preferredVariant = getPreferredVariant(productDetail?.variants)
+
+      setProductForm({
+        ...createEmptyProductForm(),
+        name: productDetail?.product_name || product.name,
+        sku: preferredVariant?.sku || "",
+        color: preferredVariant?.color_name || "",
+        brand_id: product.brand_id || "",
+        category_id: product.category_id || "",
+        brand: product.brand || productDetail?.brand_name || "",
+        price: preferredVariant ? String(Number(preferredVariant.discount_price || preferredVariant.original_price || 0)) : String(product.price || ""),
+        oldPrice: preferredVariant ? String(Number(preferredVariant.original_price || preferredVariant.discount_price || 0)) : String(product.oldPrice || product.price || ""),
+        storage: preferredVariant?.storage_gb != null ? String(preferredVariant.storage_gb) : product.storage,
+        ram: preferredVariant?.ram_gb != null ? String(preferredVariant.ram_gb) : product.ram,
+        ramType: preferredVariant?.ram_type || product.ramType || "",
+        cpu: preferredVariant?.cpu_name || product.cpu,
+        screenSize: productDetail?.screen_size != null ? String(productDetail.screen_size) : String(product.screenSize || "").replace(/[^\d.]/g, ""),
+        weightKg: productDetail?.weight_kg != null ? String(productDetail.weight_kg) : product.weightKg || "",
+        os: String(productDetail?.os || product.os || "").trim(),
+        graphics: preferredVariant?.gpu || product.graphics,
+        features: splitFeatures(productDetail?.highlight_features),
+        description: productDetail?.description_html || "",
+        highlightFeatures: productDetail?.highlight_features || "",
+        hasAI: product.hasAI || false,
+        series: product.series || productDetail?.category_name || "",
+        stock: preferredVariant ? String(Number(preferredVariant.stock_quantity || 0)) : String(product.stock || ""),
+        image: product.image,
+        imageFiles: [],
+        imagePreviews: Array.isArray(productDetail?.images)
+          ? productDetail.images.map((image) => getImageUrl(image.image_url)).filter(Boolean)
+          : (product.image ? [product.image] : []),
+        discount: product.discount,
+        installment: product.installment || "Trả góp 0%",
+        newArrival: product.newArrival || false,
+      })
+
       if (Array.isArray(productDetail?.variants)) {
         const mappedVariants = productDetail.variants.map((variant) => ({
           variant_id: variant.variant_id,
@@ -634,31 +713,69 @@ export default function Admin() {
           cpu: variant.cpu_name || "",
           gpu: variant.gpu || "",
           ram: variant.ram_gb != null ? String(variant.ram_gb) : "",
-          ramType: product.ramType || "",
+          ramType: variant.ram_type || preferredVariant?.ram_type || product.ramType || "",
           storage: variant.storage_gb != null ? String(variant.storage_gb) : "",
           color: variant.color_name || "",
           originalPrice: Number(variant.original_price || 0),
           discountPrice: variant.discount_price != null ? Number(variant.discount_price) : null,
           stock: Number(variant.stock_quantity || 0),
+          status: variant.status || getVariantStatus(variant.stock_quantity),
           imageFiles: [],
           imagePreviews: Array.isArray(variant.images)
-            ? variant.images.map((img) => img.image_url).filter(Boolean)
+            ? variant.images.map((img) => getImageUrl(img.image_url)).filter(Boolean)
             : [],
         }))
         setProductVariants(mappedVariants)
       }
     } catch (error) {
       console.error('Error loading product detail variants:', error)
+      setProductForm({
+        ...createEmptyProductForm(),
+        name: product.name,
+        sku: "",
+        color: "",
+        brand_id: product.brand_id || "",
+        category_id: product.category_id || "",
+        brand: product.brand,
+        price: String(product.price || ""),
+        oldPrice: String(product.oldPrice || product.price || ""),
+        storage: product.storage,
+        ram: product.ram,
+        ramType: product.ramType || "",
+        cpu: product.cpu,
+        screenSize: String(product.screenSize || "").replace(/[^\d.]/g, ""),
+        weightKg: product.weightKg || "",
+        os: product.os || "",
+        graphics: product.graphics,
+        features: product.features || [],
+        description: product.descriptionHtml || "",
+        highlightFeatures: product.highlightFeatures || "",
+        hasAI: product.hasAI || false,
+        series: product.series,
+        stock: String(product.stock || ""),
+        image: product.image,
+        imageFiles: [],
+        imagePreviews: product.image ? [product.image] : [],
+        discount: product.discount,
+        installment: product.installment || "Trả góp 0%",
+        newArrival: product.newArrival || false,
+      })
       alert('Không thể tải danh sách phiên bản chi tiết, bạn vẫn có thể chỉnh sửa thông tin cơ bản của sản phẩm.')
     }
 
     setActiveModule("products")
   }
 
-  const handleDeleteProduct = (id) => {
-    if (window.confirm("Bạn có chắc muốn xóa sản phẩm này?")) {
-      deleteProduct(id)
-      setInventory((prev) => prev.filter((item) => item.productId !== id))
+  const handleDeleteProduct = async (id) => {
+    if (!window.confirm("Bạn có chắc muốn ngừng kinh doanh sản phẩm này?")) return
+
+    try {
+      await deleteProduct(id)
+      setInventory((prev) => prev.filter((item) => String(item.productId) !== String(id)))
+      alert("Đã cập nhật trạng thái sản phẩm sang ngừng kinh doanh")
+    } catch (error) {
+      console.error("Error deleting product:", error)
+      alert(`Không thể cập nhật trạng thái sản phẩm: ${error.message}`)
     }
   }
 
@@ -721,11 +838,11 @@ export default function Admin() {
         date: order.order_date ? new Date(order.order_date).toLocaleDateString("vi-VN") : "",
         items: Array.isArray(order.details)
           ? order.details.map((item) => ({
-              id: item.order_detail_id,
-              name: `${item.product_name} ${item.color_name ? `- ${item.color_name}` : ""}`,
-              quantity: Number(item.quantity || 0),
-              price: Number(item.price_at_purchase || 0),
-            }))
+            id: item.order_detail_id,
+            name: `${item.product_name} ${item.color_name ? `- ${item.color_name}` : ""}`,
+            quantity: Number(item.quantity || 0),
+            price: Number(item.price_at_purchase || 0),
+          }))
           : [],
       })
     } catch (error) {
@@ -815,7 +932,7 @@ export default function Admin() {
   const renderModule = () => {
     if (activeModule === "dashboard") return <AdminDashboard revenueSummary={revenueSummary} />
     if (activeModule === "products") return (
-      <AdminProducts 
+      <AdminProducts
         filteredProducts={filteredProducts}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -839,9 +956,18 @@ export default function Admin() {
         handleDeleteVariant={handleDeleteVariant}
       />
     )
+    if (activeModule === "categories") return (
+      <AdminCategories
+        categories={categories}
+        loadingCategories={loadingCategories}
+        onCreateCategory={createCategory}
+        onUpdateCategory={updateCategory}
+        onDeleteCategory={deleteCategory}
+      />
+    )
     if (activeModule === "branch") return <AdminBranch />
     if (activeModule === "inventory") return (
-      <AdminInventory 
+      <AdminInventory
         stockForm={stockForm}
         setStockForm={setStockForm}
         handleStockImport={handleStockImport}
@@ -850,7 +976,7 @@ export default function Admin() {
       />
     )
     if (activeModule === "orders") return (
-      <AdminOrders 
+      <AdminOrders
         orders={orders}
         updateOrderStatus={updateOrderStatus}
         openOrderDetail={openOrderDetail}
@@ -859,14 +985,15 @@ export default function Admin() {
     )
     if (activeModule === "vouchers") return <AdminVouchers />
     if (activeModule === "customers") return (
-      <AdminCustomers 
+      <AdminCustomers
         customers={customers}
         toggleCustomerLock={toggleCustomerLock}
         loadingCustomers={loadingCustomers}
       />
     )
+
     if (activeModule === "content") return (
-      <AdminContent 
+      <AdminContent
         comments={comments}
         removeComment={removeComment}
         loadingComments={loadingComments}
@@ -876,14 +1003,14 @@ export default function Admin() {
     if (activeModule === "sliders") return <AdminSliderAPI />
     if (activeModule === "notifications") return <AdminNotifications />
     if (activeModule === "recommendation") return (
-      <AdminRecommendation 
+      <AdminRecommendation
         recommendationStats={recommendationStats}
         recommendationStrategy={recommendationStrategy}
         setRecommendationStrategy={setRecommendationStrategy}
       />
     )
     if (activeModule === "assistant") return (
-      <AdminAssistant 
+      <AdminAssistant
         aiLogs={aiLogs}
         aiStats={aiStats}
         aiTrainingNote={aiTrainingNote}
@@ -901,12 +1028,12 @@ export default function Admin() {
       }
 
       return (
-      <AdminStaff 
-        staffUsers={staffUsers}
-        newStaff={newStaff}
-        setNewStaff={setNewStaff}
-        createStaff={createStaff}
-      />
+        <AdminStaff
+          staffUsers={staffUsers}
+          newStaff={newStaff}
+          setNewStaff={setNewStaff}
+          createStaff={createStaff}
+        />
       )
     }
     return null

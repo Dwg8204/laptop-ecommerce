@@ -1,90 +1,248 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import * as productApi from '../services/productApi'
 import { getImageUrl } from '../config/api'
 
 const ProductContext = createContext()
+const PRODUCT_REALTIME_POLLING_MS = 5000
+
+const formatCapacity = (value) => {
+  const numeric = Number(value || 0)
+  if (!numeric) return ''
+  if (numeric >= 1024 && numeric % 1024 === 0) {
+    return `${numeric / 1024}TB`
+  }
+  return `${numeric}GB`
+}
+
+const splitHighlightFeatures = (value) => {
+  if (!value) return []
+
+  return String(value)
+    .split(/\r?\n|,|•/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+const normalizeStatusFromStock = (status, stockQuantity) => {
+  if (status) return status
+  return Number(stockQuantity || 0) > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
+}
+
+const getRepresentativeVariant = (variants = []) => {
+  if (!Array.isArray(variants) || variants.length === 0) return null
+
+  return variants.find((variant) => variant.status === 'IN_STOCK')
+    || variants.find((variant) => variant.status === 'COMING_SOON')
+    || variants.find((variant) => variant.status !== 'DISCONTINUED')
+    || variants[0]
+}
+
+const mapApiProductToUi = (product) => {
+  const representativeVariant = getRepresentativeVariant(product?.variants)
+  const listRepresentativeOriginalPrice = Number(product?.representative_original_price || 0)
+  const listRepresentativeDiscountPrice = product?.representative_discount_price != null
+    ? Number(product.representative_discount_price)
+    : 0
+  const totalStock = representativeVariant
+    ? Number(representativeVariant.stock_quantity || 0)
+    : Number(product?.total_stock_quantity || 0)
+  const price = representativeVariant
+    ? Number(representativeVariant.discount_price || representativeVariant.original_price || 0)
+    : Number(listRepresentativeDiscountPrice || listRepresentativeOriginalPrice || product?.min_price || 0)
+  const oldPrice = representativeVariant
+    ? Number(representativeVariant.original_price || representativeVariant.discount_price || 0)
+    : Number(listRepresentativeOriginalPrice || product?.max_price || price || 0)
+  const productImages = Array.isArray(product?.images) ? product.images : []
+  const primaryImage = productImages.find((image) => Number(image?.is_primary) === 1) || productImages[0]
+  const imageUrl = product?.primary_product_image_url || primaryImage?.image_url || representativeVariant?.images?.[0]?.image_url
+  const screenSizeValue = product?.screen_size != null ? String(product.screen_size) : ''
+  const ramValue = representativeVariant?.ram_gb ?? product?.representative_ram_gb ?? ''
+  const storageValue = representativeVariant?.storage_gb ?? product?.representative_storage_gb ?? ''
+  const ramLabel = formatCapacity(ramValue)
+  const storageLabel = formatCapacity(storageValue)
+  const productStatus = normalizeStatusFromStock(representativeVariant?.status, totalStock)
+
+  return {
+    id: String(product?.product_id || ''),
+    name: product?.product_name || '',
+    brand_id: product?.brand_id ? String(product.brand_id) : '',
+    category_id: product?.category_id ? String(product.category_id) : '',
+    brand: product?.brand_name || 'Unknown',
+    series: product?.category_name || '',
+    price,
+    oldPrice: oldPrice || price,
+    storage: storageLabel,
+    ram: ramLabel,
+    ramType: representativeVariant?.ram_type || '',
+    version: representativeVariant?.color_name || '',
+    cpu: representativeVariant?.cpu_name || product?.representative_cpu_name || '',
+    screenSize: screenSizeValue ? `${screenSizeValue} inch` : '',
+    weightKg: product?.weight_kg != null ? String(product.weight_kg) : '',
+    os: String(product?.os || '').trim(),
+    graphics: representativeVariant?.gpu || product?.representative_gpu || '',
+    stock: totalStock,
+    inStock: productStatus === 'IN_STOCK',
+    status: productStatus,
+    image: getImageUrl(imageUrl),
+    imageIds: productImages.map((image) => image?.image_id).filter(Boolean),
+    imageUrls: productImages.map((image) => getImageUrl(image?.image_url)).filter(Boolean),
+    specs: representativeVariant?.cpu_name || product?.representative_cpu_name || representativeVariant?.gpu || product?.representative_gpu
+      ? `${representativeVariant?.cpu_name || product?.representative_cpu_name || 'Đang cập nhật'} | ${representativeVariant?.gpu || product?.representative_gpu || 'Đang cập nhật'}`
+      : 'Đang cập nhật',
+    config: ramLabel && storageLabel && screenSizeValue
+      ? `${ramLabel}${representativeVariant?.ram_type ? ` ${representativeVariant.ram_type}` : ''} | ${storageLabel} | ${screenSizeValue} inch`
+      : 'Đang cập nhật',
+    discount: oldPrice > price && price > 0
+      ? `Giảm ${Math.round(((oldPrice - price) / oldPrice) * 100)}%`
+      : '',
+    installment: 'Trả góp 0%',
+    sold: 0,
+    newArrival: false,
+    hasAI: false,
+    descriptionHtml: product?.description_html || '',
+    highlightFeatures: product?.highlight_features || '',
+    features: splitHighlightFeatures(product?.highlight_features),
+  }
+}
+
+const mapVariantInputToApi = (variantInput) => {
+  const stockQuantity = parseInt(variantInput.stock ?? variantInput.stock_quantity ?? 0, 10) || 0
+  const rawBenchmark = variantInput.cpu_benchmark_score
+  const parsedBenchmark =
+    rawBenchmark === '' || rawBenchmark === null || rawBenchmark === undefined
+      ? undefined
+      : parseInt(rawBenchmark, 10)
+  const benchmarkValue = Number.isFinite(parsedBenchmark) && parsedBenchmark > 0
+    ? parsedBenchmark
+    : undefined
+
+  const rawDiscountPrice = variantInput.discount_price ?? variantInput.discountPrice
+  const parsedDiscountPrice =
+    rawDiscountPrice === '' || rawDiscountPrice === null || rawDiscountPrice === undefined
+      ? undefined
+      : parseFloat(rawDiscountPrice)
+  const discountPriceValue = Number.isFinite(parsedDiscountPrice) ? parsedDiscountPrice : undefined
+
+  return {
+    sku: String(variantInput.sku || '').trim(),
+    cpu_name: variantInput.cpu_name || variantInput.cpu || null,
+    cpu_benchmark_score: benchmarkValue,
+    gpu: variantInput.gpu || null,
+    ram_gb: parseInt(variantInput.ram_gb ?? variantInput.ram, 10),
+    ram_type: variantInput.ram_type || variantInput.ramType || null,
+    storage_gb: parseInt(variantInput.storage_gb ?? variantInput.storage, 10),
+    color_name: String(variantInput.color_name || variantInput.color || '').trim(),
+    original_price: parseFloat(variantInput.original_price ?? variantInput.originalPrice),
+    discount_price: discountPriceValue,
+    stock_quantity: stockQuantity,
+    status: normalizeStatusFromStock(variantInput.status, stockQuantity),
+  }
+}
 
 export function ProductProvider({ children }) {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const inFlightRefreshRef = useRef(false)
+  const productSyncChannelRef = useRef(null)
 
-  // Fetch products from API when component mounts
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
+  const broadcastProductSync = useCallback((action) => {
+    if (!productSyncChannelRef.current) return
+    try {
+      productSyncChannelRef.current.postMessage({
+        type: 'PRODUCTS_UPDATED',
+        action,
+        at: Date.now(),
+      })
+    } catch {
+      // Ignore browser compatibility/runtime issues for optional cross-tab sync.
+    }
+  }, [])
+
+  const refreshProducts = useCallback(async ({ silent = false } = {}) => {
+    if (inFlightRefreshRef.current) {
+      return
+    }
+
+    inFlightRefreshRef.current = true
+
+    try {
+      if (!silent) {
         setLoading(true)
         setError(null)
-        const response = await productApi.getAllProducts({ limit: 100 })
+      }
 
-        // API list response uses pagination shape: { data: [...], pagination: {...} }
-        // and may not include a `success` flag.
-        const productList = Array.isArray(response?.data)
-          ? response.data
-          : Array.isArray(response)
-            ? response
-            : []
+      const response = await productApi.getAllProducts({ limit: 100 })
+      const productList = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : []
 
-        // Transform backend list/detail data to frontend format.
-        const transformedProducts = productList.map((product) => {
-          const variant = product.variants?.[0]
-          const price = variant?.price ?? product.min_price ?? 0
-          const oldPrice = variant?.compare_at_price ?? product.max_price ?? price
-          const stock = variant?.stock_quantity ?? product.total_stock_quantity ?? 0
-          const ram = variant?.ram ?? (product.representative_ram_gb ? `${product.representative_ram_gb}GB` : '')
-          const storage = variant?.storage ?? (product.representative_storage_gb ? `${product.representative_storage_gb}GB` : '')
-          const cpu = variant?.cpu ?? product.representative_cpu_name ?? ''
-          const graphics = variant?.graphics_card ?? product.representative_gpu ?? ''
-          const version = variant?.color_name || ''
-
-          return {
-            id: String(product.product_id),
-            name: product.product_name,
-            brand_id: product.brand_id ? String(product.brand_id) : '',
-            category_id: product.category_id ? String(product.category_id) : '',
-            brand: product.brand_name || 'Unknown',
-            series: product.category_name || '',
-            price: Number(price) || 0,
-            oldPrice: Number(oldPrice) || Number(price) || 0,
-            storage,
-            ram,
-            ramType: variant?.ram_type || '',
-            version,
-            cpu,
-            screenSize: product.screen_size ? `${product.screen_size} inch` : '',
-            weightKg: product.weight_kg || '',
-            os: product.os || '',
-            graphics,
-            stock: Number(stock) || 0,
-            inStock: Number(stock) > 0,
-            image: getImageUrl(product.primary_product_image_url || product.images?.[0]?.image_url || variant?.images?.[0]?.image_url),
-            specs: cpu && graphics ? `${cpu} | ${graphics}` : 'Đang cập nhật',
-            config: ram && storage && product.screen_size
-              ? `${ram}${variant?.ram_type ? ` ${variant.ram_type}` : ''} | ${storage} | ${product.screen_size} inch`
-              : 'Đang cập nhật',
-            discount: Number(oldPrice) > Number(price) && Number(price) > 0
-              ? `Giảm ${Math.round(((Number(oldPrice) - Number(price)) / Number(oldPrice)) * 100)}%`
-              : '',
-            installment: 'Trả góp 0%',
-            sold: 0,
-            newArrival: false,
-            hasAI: false,
-            features: product.highlight_features ? [product.highlight_features] : [],
-          }
-        })
-
-        setProducts(transformedProducts)
-      } catch (err) {
-        console.error('Error fetching products:', err)
+      setProducts(productList.map(mapApiProductToUi))
+    } catch (err) {
+      console.error('Error fetching products:', err)
+      if (!silent) {
         setError(err.message)
-        // Keep products empty on error instead of using defaults
-      } finally {
+      }
+    } finally {
+      if (!silent) {
         setLoading(false)
+      }
+      inFlightRefreshRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshProducts()
+  }, [refreshProducts])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      refreshProducts({ silent: true })
+    }, PRODUCT_REALTIME_POLLING_MS)
+
+    const handleFocus = () => {
+      refreshProducts({ silent: true })
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshProducts({ silent: true })
       }
     }
 
-    fetchProducts()
-  }, [])
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [refreshProducts])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.BroadcastChannel === 'undefined') {
+      return undefined
+    }
+
+    const channel = new window.BroadcastChannel('products-sync')
+    productSyncChannelRef.current = channel
+
+    channel.onmessage = (event) => {
+      if (event?.data?.type === 'PRODUCTS_UPDATED') {
+        refreshProducts({ silent: true })
+      }
+    }
+
+    return () => {
+      channel.close()
+      if (productSyncChannelRef.current === channel) {
+        productSyncChannelRef.current = null
+      }
+    }
+  }, [refreshProducts])
 
   const addProduct = async (productData) => {
     try {
@@ -111,7 +269,7 @@ export function ProductProvider({ children }) {
           const ramValue = parseInt(v.ram)
           const storageValue = parseInt(v.storage)
           const originalPrice = parseFloat(v.originalPrice)
-          const discountPrice = v.discountPrice ? parseFloat(v.discountPrice) : null
+          const discountPrice = v.discountPrice ? parseFloat(v.discountPrice) : undefined
           const stockQuantity = parseInt(v.stock) || 0
           const normalizedSku = String(v.sku || '').trim()
 
@@ -199,42 +357,17 @@ export function ProductProvider({ children }) {
 
       const response = await productApi.createProduct(apiData)
 
-      if (response.success && response.data) {
-        // Transform and add to local state
-        const newProduct = {
-          id: response.data.product_id.toString(),
-          name: response.data.product_name,
-          brand_id: String(productData.brand_id || ''),
-          category_id: String(productData.category_id || ''),
-          brand: productData.brand,
-          series: productData.series || '',
-          price: parseFloat(productData.price),
-          oldPrice: parseFloat(productData.oldPrice || productData.price),
-          storage: productData.storage,
-          ram: productData.ram,
-          ramType: productData.ramType,
-          version: productData.version || '',
-          cpu: productData.cpu,
-          screenSize: productData.screenSize,
-          weightKg: productData.weightKg,
-          os: productData.os,
-          graphics: productData.graphics,
-          stock: parseInt(productData.stock) || 0,
-          inStock: parseInt(productData.stock) > 0,
-          image: getImageUrl(productData.image),
-          specs: productData.specs || `${productData.cpu} | ${productData.graphics}`,
-          config: productData.config || `${productData.ram} | ${productData.storage} | ${productData.screenSize}`,
-          discount: productData.discount,
-          installment: productData.installment || 'Trả góp 0%',
-          sold: 0,
-          newArrival: productData.newArrival || false,
-          hasAI: productData.hasAI || false,
-          features: productData.features || [],
-        }
-
-        setProducts(prev => [newProduct, ...prev])
+      if (response.success && response.data?.product_id) {
+        const detailResponse = await productApi.getProductById(response.data.product_id)
+        const newProduct = mapApiProductToUi(detailResponse?.data || {})
+        setProducts((prev) => [newProduct, ...prev.filter((item) => item.id !== newProduct.id)])
+        refreshProducts({ silent: true })
+        broadcastProductSync('CREATE_PRODUCT')
         return newProduct
       }
+
+      await refreshProducts()
+      return response
     } catch (err) {
       console.error('Error adding product:', err)
       setError(err.message)
@@ -249,50 +382,80 @@ export function ProductProvider({ children }) {
       setLoading(true)
       setError(null)
 
-      // Transform frontend data to backend format
+      const variantsToUpdate = []
+      const variantsToCreate = []
+      const variantImagesToUpdate = []
+      const variantImagesToCreate = []
+
+      if (Array.isArray(updates.productVariants)) {
+        updates.productVariants.forEach((variant) => {
+          const mappedVariant = mapVariantInputToApi(variant)
+
+          if (variant.variant_id) {
+            variantsToUpdate.push({
+              variant_id: Number(variant.variant_id),
+              data: mappedVariant,
+            })
+            variantImagesToUpdate.push(Array.isArray(variant.imageFiles) ? variant.imageFiles : [])
+          } else {
+            variantsToCreate.push(mappedVariant)
+            variantImagesToCreate.push(Array.isArray(variant.imageFiles) ? variant.imageFiles : [])
+          }
+        })
+      }
+
       const apiData = {
-        product_name: updates.name,
-        brand_id: updates.brand_id || 1,
-        category_id: updates.category_id || 1,
-        description_html: updates.description,
-        highlight_features: updates.features?.join(', '),
-        screen_size: parseFloat(updates.screenSize) || undefined,
-        weight_kg: parseFloat(updates.weightKg) || undefined,
+        product_name: updates.product_name || updates.name,
+        brand_id: updates.brand_id ? parseInt(updates.brand_id, 10) : undefined,
+        category_id: updates.category_id ? parseInt(updates.category_id, 10) : undefined,
+        description_html: updates.description_html ?? updates.description,
+        highlight_features: updates.highlight_features ?? updates.highlightFeatures ?? updates.features?.join(', '),
+        screen_size: updates.screen_size ?? (updates.screenSize ? parseFloat(updates.screenSize) : undefined),
+        weight_kg: updates.weight_kg ?? (updates.weightKg ? parseFloat(updates.weightKg) : undefined),
         os: updates.os,
-      }
-
-      // Add variants if product data includes variant info
-      if (updates.ram || updates.storage || updates.price) {
-        apiData.variants = [{
-          ram: updates.ram,
-          ram_type: updates.ramType || 'DDR4',
-          storage: updates.storage,
-          cpu: updates.cpu,
-          graphics_card: updates.graphics,
-          price: parseFloat(updates.price),
-          compare_at_price: parseFloat(updates.oldPrice || updates.price),
-          stock_quantity: parseInt(updates.stock) || 0,
-          status: parseInt(updates.stock) > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
-        }]
-      }
-
-      // Add images if provided
-      if (updates.productImages) {
-        apiData.productImages = updates.productImages
-      }
-      if (updates.variantImages) {
-        apiData.variantImages = updates.variantImages
+        variants_to_update: variantsToUpdate,
+        variants_to_create: variantsToCreate,
+        variantImagesToUpdate,
+        variantImagesToCreate,
+        newProductImages: updates.newProductImages || updates.productImages,
       }
 
       const response = await productApi.updateProduct(id, apiData)
 
+      const hasNewProductImages = Array.isArray(updates.newProductImages || updates.productImages)
+        && (updates.newProductImages || updates.productImages).length > 0
+      const hasExplicitPrimaryImage = updates.primary_product_image_id != null
+
       if (response.success) {
-        // Update local state
-        const updatedProducts = products.map(p => 
-          p.id === id ? { ...p, ...updates, inStock: updates.stock > 0 } : p
-        )
-        setProducts(updatedProducts)
+        let detailResponse = await productApi.getProductById(id)
+
+        // Backend adds new product images as secondary by default. Promote latest uploaded image to primary
+        // so storefront immediately shows the newly added image.
+        if (hasNewProductImages && !hasExplicitPrimaryImage) {
+          const productImages = Array.isArray(detailResponse?.data?.images) ? detailResponse.data.images : []
+          const newestImage = productImages.reduce((latest, image) => {
+            if (!image?.image_id) return latest
+            if (!latest || Number(image.image_id) > Number(latest.image_id)) {
+              return image
+            }
+            return latest
+          }, null)
+
+          if (newestImage?.image_id) {
+            await productApi.updateProduct(id, {
+              primary_product_image_id: Number(newestImage.image_id),
+            })
+            detailResponse = await productApi.getProductById(id)
+          }
+        }
+
+        const updatedProduct = mapApiProductToUi(detailResponse?.data || {})
+        setProducts((prev) => prev.map((product) => (product.id === String(id) ? updatedProduct : product)))
+        refreshProducts({ silent: true })
+        broadcastProductSync('UPDATE_PRODUCT')
       }
+
+      return response
     } catch (err) {
       console.error('Error updating product:', err)
       setError(err.message)
@@ -310,9 +473,16 @@ export function ProductProvider({ children }) {
       const response = await productApi.deleteProduct(id)
 
       if (response.success) {
-        const updatedProducts = products.filter(p => p.id !== id)
-        setProducts(updatedProducts)
+        setProducts((prev) => prev.map((product) => (
+          product.id === String(id)
+            ? { ...product, status: 'DISCONTINUED', inStock: false }
+            : product
+        )))
+        refreshProducts({ silent: true })
+        broadcastProductSync('DISCONTINUE_PRODUCT')
       }
+
+      return response
     } catch (err) {
       console.error('Error deleting product:', err)
       setError(err.message)
@@ -356,9 +526,9 @@ export function ProductProvider({ children }) {
         storage_gb: storageValue,
         color_name: variantInput.color,
         original_price: originalPrice,
-        discount_price: discountPrice,
+        discount_price: discountPrice ?? undefined,
         stock_quantity: stockQuantity,
-        status: stockQuantity > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
+        status: normalizeStatusFromStock(variantInput.status, stockQuantity)
       }
 
       const response = await productApi.addVariantToProduct(productId, variantData, variantImages)
@@ -377,6 +547,8 @@ export function ProductProvider({ children }) {
             inStock: true,
           }
         }))
+        refreshProducts({ silent: true })
+        broadcastProductSync('CREATE_VARIANT')
       }
 
       return response
@@ -421,12 +593,17 @@ export function ProductProvider({ children }) {
         storage_gb: storageValue,
         color_name: variantInput.color,
         original_price: originalPrice,
-        discount_price: discountPrice,
+        discount_price: discountPrice ?? undefined,
         stock_quantity: stockQuantity,
-        status: stockQuantity > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
+        status: normalizeStatusFromStock(variantInput.status, stockQuantity)
       }
 
-      return await productApi.updateProductVariant(productId, variantId, variantData, variantImages)
+      const response = await productApi.updateProductVariant(productId, variantId, variantData, variantImages)
+      if (response?.success) {
+        refreshProducts({ silent: true })
+        broadcastProductSync('UPDATE_VARIANT')
+      }
+      return response
     } catch (err) {
       console.error('Error updating product variant:', err)
       setError(err.message)
@@ -440,7 +617,12 @@ export function ProductProvider({ children }) {
     try {
       setLoading(true)
       setError(null)
-      return await productApi.deleteVariantFromProduct(productId, variantId)
+      const response = await productApi.deleteVariantFromProduct(productId, variantId)
+      if (response?.success) {
+        refreshProducts({ silent: true })
+        broadcastProductSync('DELETE_VARIANT')
+      }
+      return response
     } catch (err) {
       console.error('Error deleting product variant:', err)
       setError(err.message)
@@ -465,6 +647,7 @@ export function ProductProvider({ children }) {
     updateProduct,
     deleteProduct,
     getProductById,
+    refreshProducts,
   }
 
   return <ProductContext.Provider value={value}>{children}</ProductContext.Provider>

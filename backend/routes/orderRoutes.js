@@ -14,6 +14,9 @@ router.get('/:id', orderController.getOrderById);
 // PUT cập nhật trạng thái đơn hàng (chủ yếu Admin)
 router.put('/:id/status', orderController.updateOrderStatus);
 
+// PUT cập nhật địa chỉ giao hàng cho đơn trước trạng thái PROCESSING
+router.put('/:id/address', orderController.updateOrderAddress);
+
 // DELETE hủy đơn hàng (khách hàng hoặc Admin)
 router.delete('/:id/cancel', orderController.cancelOrder);
 

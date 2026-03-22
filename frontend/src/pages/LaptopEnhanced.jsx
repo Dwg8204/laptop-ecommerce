@@ -9,6 +9,7 @@ import ProductListSection from "../components/ProductListSection"
 import HomeArticleSection from "../components/HomeArticleSection"
 import QASection from "../components/QASection"
 import Footer from "../components/Footer"
+import "../styles/HomeContainer.css"
 
 export default function Laptop() {
   const [filters, setFilters] = useState(null)
@@ -23,14 +24,16 @@ export default function Laptop() {
 
   return (
     <>
-      <CategoryBar />
-      <BannerSlider />
-      <LaptopFilterSection />
-      <FeaturedProducts />
-      <FilterBar onFilterChange={handleFilterChange} />
-      <ProductListSection filters={filters} sortBy={sortBy} selectedCategory={selectedCategory} />
-      <HomeArticleSection />
-      <QASection />
+      <div className="home-page-shell">
+        <CategoryBar />
+        <BannerSlider />
+        <LaptopFilterSection />
+        <FeaturedProducts />
+        <FilterBar onFilterChange={handleFilterChange} />
+        <ProductListSection filters={filters} sortBy={sortBy} selectedCategory={selectedCategory} />
+        <HomeArticleSection />
+        <QASection />
+      </div>
       <Footer />
     </>
   )
