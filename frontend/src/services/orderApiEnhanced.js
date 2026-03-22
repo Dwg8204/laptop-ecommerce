@@ -50,3 +50,10 @@ export const updateOrderStatus = async (id, status) => {
     body: JSON.stringify({ status }),
   })
 }
+
+export const updateOrderAddress = async (id, payload) => {
+  return requestJson(`${API_BASE}/${id}/address`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}

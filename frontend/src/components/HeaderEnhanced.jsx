@@ -1,5 +1,5 @@
 import { FiShoppingCart, FiUser, FiSearch, FiList, FiLogOut, FiPackage, FiBell } from 'react-icons/fi'
-import { MdFiberNew } from 'react-icons/md'
+import { MdFiberNew, MdLocalOffer, MdVerifiedUser, MdLocalShipping, MdLocationOn, MdPhone } from 'react-icons/md'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -36,12 +36,12 @@ export default function Header() {
     loadCategories()
   }, [])
   const topBarContent = [
-    '⚙️ Thu cũ giá ngon - Lên đời tiết kiệm',
-    '✅ Sản phẩm chính hãng - Xuất VAT đầy đủ',
-    '🚚 Giao nhanh - Miễn phí cho đơn 300K',
-    '🏬 Cửa hàng gần bạn',
-    '📦 Tra cứu đơn hàng',
-    '📞 1800 2097'
+    { icon: MdLocalOffer, text: 'Thu cũ giá ngon - Lên đời tiết kiệm' },
+    { icon: MdVerifiedUser, text: 'Sản phẩm chính hãng - Xuất VAT đầy đủ' },
+    { icon: MdLocalShipping, text: 'Giao nhanh - Miễn phí cho đơn 300K' },
+    { icon: MdLocationOn, text: 'Cửa hàng gần bạn' },
+    { icon: FiPackage, text: 'Tra cứu đơn hàng' },
+    { icon: MdPhone, text: '1800 2097' }
   ]
 
   const handleLogout = () => {
@@ -90,20 +90,28 @@ export default function Header() {
         <div style={styles.topBar}>
           <div style={styles.topBarTrack}>
             <div style={styles.topBarGroup}>
-              {topBarContent.map((text, index) => (
-                <span style={styles.topBarItem} key={`topbar-1-${index}`}>
-                  {text}
-                  <span style={styles.topBarDivider}>•</span>
-                </span>
-              ))}
+              {topBarContent.map((item, index) => {
+                const IconComponent = item.icon
+                return (
+                  <span style={styles.topBarItem} key={`topbar-1-${index}`}>
+                    <IconComponent size={16} style={{ marginRight: '6px', flexShrink: 0 }} />
+                    {item.text}
+                    <span style={styles.topBarDivider}>•</span>
+                  </span>
+                )
+              })}
             </div>
             <div style={styles.topBarGroup} aria-hidden="true">
-              {topBarContent.map((text, index) => (
-                <span style={styles.topBarItem} key={`topbar-2-${index}`}>
-                  {text}
-                  <span style={styles.topBarDivider}>•</span>
-                </span>
-              ))}
+              {topBarContent.map((item, index) => {
+                const IconComponent = item.icon
+                return (
+                  <span style={styles.topBarItem} key={`topbar-2-${index}`}>
+                    <IconComponent size={16} style={{ marginRight: '6px', flexShrink: 0 }} />
+                    {item.text}
+                    <span style={styles.topBarDivider}>•</span>
+                  </span>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -204,6 +212,16 @@ export default function Header() {
                       className="user-dropdown-item" 
                       onClick={() => {
                         setShowUserMenu(false)
+                        navigate('/profile')
+                      }}
+                    >
+                      <FiUser size={16} />
+                      Trang cá nhân
+                    </button>
+                    <button 
+                      className="user-dropdown-item" 
+                      onClick={() => {
+                        setShowUserMenu(false)
                         navigate('/order-tracking')
                       }}
                     >
@@ -235,6 +253,7 @@ const styles = {
     position: 'sticky',
     top: 0,
     zIndex: 1100,
+    fontFamily: '"Roboto", "Helvetica Neue", Arial, sans-serif',
     boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)'
   },
 

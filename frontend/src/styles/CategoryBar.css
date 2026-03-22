@@ -14,7 +14,8 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 20px;
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 500;
   justify-content: flex-start;
   padding-left: 40px;
   width: 100%;
@@ -52,7 +53,8 @@
   padding: 12px 18px;
   border-radius: 12px;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
+  font-weight: 500;
   transition: 0.2s;
   white-space: nowrap;
 }
@@ -64,7 +66,7 @@
 .category-item.active {
   border: 2px solid #e30019;
   color: #e30019;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .divider {

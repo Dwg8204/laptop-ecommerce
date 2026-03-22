@@ -43,6 +43,11 @@ const formatDate = (value) => {
   return date.toLocaleDateString("vi-VN")
 }
 
+const isPurchasableVariant = (variant) => {
+  if (!variant) return false
+  return variant.status !== "DISCONTINUED"
+}
+
 const getPrimaryImage = (productDetail, variant, imageOverride) => {
   if (imageOverride) return imageOverride
   return getImageUrl(
@@ -115,6 +120,10 @@ export default function ProductDetail() {
   const [activeCompareSlot, setActiveCompareSlot] = useState(0)
   const [compareLoadingSlot, setCompareLoadingSlot] = useState(null)
   const [selectedColor, setSelectedColor] = useState("")
+  const currentProductSummary = useMemo(
+    () => products.find((item) => String(item.id) === String(id)) || null,
+    [id, products],
+  )
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -127,7 +136,14 @@ export default function ProductDetail() {
         }
 
         const detail = response.data
-        setProduct(detail)
+        const activeVariants = Array.isArray(detail.variants)
+          ? detail.variants.filter((variant) => isPurchasableVariant(variant))
+          : []
+        const normalizedDetail = {
+          ...detail,
+          variants: activeVariants.length > 0 ? activeVariants : detail.variants || [],
+        }
+        setProduct(normalizedDetail)
         setSelectedVariantIndex(0)
         setQuantity(1)
         setActiveTab("overview")
@@ -138,10 +154,10 @@ export default function ProductDetail() {
         setShowCompareResults(false)
         setIsComparePickerOpen(false)
         setIsCompareDockCollapsed(false)
-        setSelectedColor(detail.variants?.[0]?.color_name || "")
+        setSelectedColor(normalizedDetail.variants?.[0]?.color_name || "")
 
-        const firstVariantImage = detail.variants?.[0]?.images?.[0]?.image_url
-        const firstProductImage = detail.images?.[0]?.image_url
+        const firstVariantImage = normalizedDetail.variants?.[0]?.images?.[0]?.image_url
+        const firstProductImage = normalizedDetail.images?.[0]?.image_url
         setSelectedImage(getImageUrl(firstVariantImage || firstProductImage || FALLBACK_IMAGE))
       } catch (err) {
         console.error("Error fetching product detail:", err)
@@ -251,10 +267,10 @@ export default function ProductDetail() {
   const compareCandidates = useMemo(() => {
     const others = products.filter((item) => String(item.id) !== String(id))
     const prioritized = others.filter(
-      (item) => item.brand_id === String(product?.brand_id || "") || item.category_id === String(product?.category_id || ""),
+      (item) => item.brand_id === String(currentProductSummary?.brand_id || "") || item.category_id === String(currentProductSummary?.category_id || ""),
     )
     const fallback = others.filter(
-      (item) => item.brand_id !== String(product?.brand_id || "") && item.category_id !== String(product?.category_id || ""),
+      (item) => item.brand_id !== String(currentProductSummary?.brand_id || "") && item.category_id !== String(currentProductSummary?.category_id || ""),
     )
     const merged = [...prioritized, ...fallback]
     const normalizedQuery = compareQuery.trim().toLowerCase()
@@ -267,7 +283,7 @@ export default function ProductDetail() {
       const searchable = `${item.name} ${item.brand} ${item.config} ${item.cpu} ${item.graphics}`.toLowerCase()
       return searchable.includes(normalizedQuery)
     }).slice(0, 12)
-  }, [compareQuery, id, product, products])
+  }, [compareQuery, currentProductSummary, id, products])
 
   const primaryCompareItem = useMemo(
     () => buildCompareEntry(product, selectedVariantIndex, selectedImage),
@@ -373,6 +389,16 @@ export default function ProductDetail() {
   const handleAddToCart = () => {
     if (!selectedVariant) {
       setAddMessage("Sản phẩm chưa có phiên bản khả dụng")
+      return
+    }
+
+    if (selectedVariant.status === "COMING_SOON") {
+      setAddMessage("Phiên bản này chưa mở bán")
+      return
+    }
+
+    if (selectedVariant.status === "OUT_OF_STOCK" || Number(selectedVariant.stock_quantity || 0) <= 0) {
+      setAddMessage("Phiên bản này đang hết hàng")
       return
     }
 
@@ -540,18 +566,21 @@ export default function ProductDetail() {
                     const price = toNumber(variant.discount_price || variant.original_price)
                     const label = variant.sku || "SKU chưa cập nhật"
                     const index = variant.originalIndex
+                    const unavailable = variant.status === "COMING_SOON" || variant.status === "OUT_OF_STOCK"
 
                     return (
                       <button
                         key={variant.variant_id}
                         className={`pd-config-item ${index === selectedVariantIndex ? "active" : ""}`}
                         onClick={() => setSelectedVariantIndex(index)}
+                        disabled={variant.status === "DISCONTINUED"}
                       >
                         <strong>{label}</strong>
                         <span><FiCpu /> {variant.cpu_name || "Đang cập nhật"}</span>
                         <span><FiHardDrive /> {variant.gpu || "Đang cập nhật"}</span>
-                        <span>Tồn kho: {variant.stock_quantity}</span>
+                        <span>{variant.status === "COMING_SOON" ? "Sắp mở bán" : `Tồn kho: ${variant.stock_quantity}`}</span>
                         <em>{formatCurrency(price)}</em>
+                        {unavailable && <small>{variant.status === "COMING_SOON" ? "Chưa thể mua ngay" : "Tạm hết hàng"}</small>}
                       </button>
                     )
                   })}

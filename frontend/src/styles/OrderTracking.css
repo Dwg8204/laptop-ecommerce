@@ -174,6 +174,11 @@
   color: #92400e;
 }
 
+.ot-status.status-waiting-stock {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
 .ot-status.status-preparing {
   background: #dbeafe;
   color: #1e40af;
@@ -269,6 +274,73 @@
   font-weight: 600;
   display: flex;
   align-items: center;
+}
+
+.ot-info-item small {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.ot-info-item-full {
+  grid-column: 1 / -1;
+}
+
+.ot-shipping-address-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.ot-shipping-address-card h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.ot-shipping-note {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.ot-address-edit-row {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ot-address-select {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+  color: #0f172a;
+  background: #fff;
+}
+
+.ot-address-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+.ot-address-message {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ot-address-message.success {
+  color: #166534;
+}
+
+.ot-address-message.error {
+  color: #b91c1c;
 }
 
 .ot-amount {
@@ -440,6 +512,11 @@
 
   .ot-order-info {
     grid-template-columns: 1fr;
+  }
+
+  .ot-address-edit-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .ot-tracking-detail {

@@ -3,6 +3,26 @@ import { FiEdit, FiLayers, FiInfo, FiPlus, FiSave, FiTrash2, FiX } from "react-i
 
 const toCurrency = (value) => `${Number(value).toLocaleString("vi-VN")}đ`
 
+const getStatusMeta = (status, stock) => {
+  if (status === "DISCONTINUED") {
+    return { tone: "danger", text: "Ngừng kinh doanh" }
+  }
+
+  if (status === "COMING_SOON") {
+    return { tone: "warn", text: "Sắp mở bán" }
+  }
+
+  if (status === "OUT_OF_STOCK" || Number(stock) === 0) {
+    return { tone: "danger", text: "Hết hàng" }
+  }
+
+  if (Number(stock) <= 10) {
+    return { tone: "warn", text: "Sắp hết" }
+  }
+
+  return { tone: "ok", text: "Còn hàng" }
+}
+
 export default function AdminProducts({ 
   filteredProducts, 
   searchTerm, 
@@ -63,12 +83,40 @@ export default function AdminProducts({
   const emptyVariantFormLocal = {
     sku: "", cpu: "", gpu: "", ram: "", ramType: "", storage: "",
     color: "", originalPrice: "", discountPrice: "", stock: "",
+    status: "IN_STOCK",
     imageFiles: [], imagePreviews: [],
   }
 
   const cancelEditVariant = () => {
     setEditingVariantIndex(-1)
     setVariantForm(emptyVariantFormLocal)
+  }
+
+  const handleInfoStepSubmit = (event) => {
+    if (editingProductId) {
+      handleProductSubmit(event)
+      return
+    }
+
+    event.preventDefault()
+
+    const normalizedSku = String(productForm.sku || '').trim()
+    if (normalizedSku && !String(variantForm.sku || '').trim()) {
+      setVariantForm((prev) => ({
+        ...prev,
+        sku: normalizedSku,
+      }))
+    }
+
+    const normalizedColor = String(productForm.color || '').trim()
+    if (normalizedColor && !String(variantForm.color || '').trim()) {
+      setVariantForm((prev) => ({
+        ...prev,
+        color: normalizedColor,
+      }))
+    }
+
+    setActiveTab("variants")
   }
 
   return (
@@ -104,7 +152,7 @@ export default function AdminProducts({
 
         {/* ===== TAB 1: Product info ===== */}
         {activeTab === "info" && (
-          <form className="adm-form" onSubmit={handleProductSubmit}>
+          <form className="adm-form" onSubmit={handleInfoStepSubmit}>
             <div className="adm-form-row adm-span2">
               <label>Tên sản phẩm *</label>
               <input
@@ -112,6 +160,25 @@ export default function AdminProducts({
                 value={productForm.name}
                 onChange={(e) => setProductForm((prev) => ({ ...prev, name: e.target.value }))}
                 required
+              />
+            </div>
+
+            <div className="adm-form-row">
+              <label>Tên phiên bản {editingProductId ? "" : "*"}</label>
+              <input
+                placeholder="VD: ASUS-TUF-F15-DEFAULT"
+                value={productForm.sku}
+                onChange={(e) => setProductForm((prev) => ({ ...prev, sku: e.target.value }))}
+                required={!editingProductId}
+              />
+            </div>
+
+            <div className="adm-form-row">
+              <label>Màu</label>
+              <input
+                placeholder="VD: Đen"
+                value={productForm.color}
+                onChange={(e) => setProductForm((prev) => ({ ...prev, color: e.target.value }))}
               />
             </div>
 
@@ -159,6 +226,32 @@ export default function AdminProducts({
               </select>
             </div>
 
+            <div className="adm-form-row adm-span2">
+              <label>Điểm nổi bật</label>
+              <textarea
+                rows={3}
+                placeholder="Ví dụ: Màn hình 165Hz, tản nhiệt tốt, bàn phím RGB"
+                value={productForm.highlightFeatures}
+                onChange={(e) => setProductForm((prev) => ({ ...prev, highlightFeatures: e.target.value, features: e.target.value.split(/\r?\n|,|•/).map((item) => item.trim()).filter(Boolean) }))}
+              />
+            </div>
+
+            <div className="adm-form-row adm-span2">
+              <label>Mô tả sản phẩm (HTML hoặc văn bản)</label>
+              <textarea
+                rows={5}
+                placeholder="<p>Laptop gaming hiệu năng cao...</p>"
+                value={productForm.description}
+                onChange={(e) => setProductForm((prev) => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+
+            <div className="adm-form-row adm-span2">
+              <small style={{ color: "#8a6d3b", fontWeight: 600 }}>
+                Các trường giá, CPU, RAM, SSD và tồn kho trong tab này sẽ đồng bộ vào phiên bản đại diện đầu tiên để khớp với API backend.
+              </small>
+            </div>
+
             <div className="adm-form-row">
               <label>Giá bán *</label>
               <input type="number" placeholder="Tự lấy từ phiên bản đầu tiên" value={productForm.price} onChange={(e) => setProductForm((prev) => ({ ...prev, price: e.target.value }))} />
@@ -172,11 +265,6 @@ export default function AdminProducts({
             <div className="adm-form-row">
               <label>CPU</label>
               <input placeholder="Ưu tiên lấy từ phiên bản" value={productForm.cpu} onChange={(e) => setProductForm((prev) => ({ ...prev, cpu: e.target.value }))} />
-            </div>
-
-            <div className="adm-form-row">
-              <label>Phiên bản</label>
-              <input type="text" placeholder="Ưu tiên lấy từ phiên bản" value={productForm.version} onChange={(e) => setProductForm((prev) => ({ ...prev, version: e.target.value }))} />
             </div>
 
             <div className="adm-form-row">
@@ -256,7 +344,7 @@ export default function AdminProducts({
               )}
               <button className="adm-btn adm-btn-primary" type="submit">
                 {editingProductId ? <FiSave /> : <FiPlus />}
-                {editingProductId ? "Cập nhật sản phẩm" : "Thêm mới"}
+                {editingProductId ? "Cập nhật sản phẩm" : "Tiếp tục: Quản lý phiên bản"}
               </button>
             </div>
           </form>
@@ -276,7 +364,7 @@ export default function AdminProducts({
 
               <div className="adm-variant-grid">
                 <div>
-                  <label>SKU *</label>
+                  <label>Tên phiên bản </label>
                   <input type="text" placeholder="VD: ASUS-TUF-F15-BLK-16-512" value={variantForm.sku} onChange={(e) => setVariantForm((prev) => ({ ...prev, sku: e.target.value }))} />
                 </div>
                 <div>
@@ -311,6 +399,15 @@ export default function AdminProducts({
                 <div>
                   <label>Tồn kho *</label>
                   <input type="number" placeholder="VD: 10" value={variantForm.stock} onChange={(e) => setVariantForm((prev) => ({ ...prev, stock: e.target.value }))} />
+                </div>
+                <div>
+                  <label>Trạng thái *</label>
+                  <select value={variantForm.status} onChange={(e) => setVariantForm((prev) => ({ ...prev, status: e.target.value }))}>
+                    <option value="IN_STOCK">Còn hàng</option>
+                    <option value="OUT_OF_STOCK">Hết hàng</option>
+                    <option value="COMING_SOON">Sắp mở bán</option>
+                    <option value="DISCONTINUED">Ngừng kinh doanh</option>
+                  </select>
                 </div>
                 <div>
                   <label>Giá gốc *</label>
@@ -370,6 +467,7 @@ export default function AdminProducts({
                         <th>Giá gốc</th>
                         <th>Giá KM</th>
                         <th>Kho</th>
+                        <th>Trạng thái</th>
                         <th>Ảnh</th>
                         <th>Tác vụ</th>
                       </tr>
@@ -388,6 +486,7 @@ export default function AdminProducts({
                           <td className="adm-money">{toCurrency(variant.originalPrice)}</td>
                           <td className="adm-money">{variant.discountPrice ? toCurrency(variant.discountPrice) : "-"}</td>
                           <td>{variant.stock}</td>
+                          <td><span className={`adm-status2 ${getStatusMeta(variant.status, variant.stock).tone}`}>{getStatusMeta(variant.status, variant.stock).text}</span></td>
                           <td>{variant.imageFiles?.length || variant.imagePreviews?.length || 0}</td>
                           <td>
                             <div className="adm-row-actions adm-row-actions-compact">
@@ -409,6 +508,25 @@ export default function AdminProducts({
                   </table>
                 </div>
               )}
+
+              <div className="adm-form-actions" style={{ marginTop: 16 }}>
+                {!editingProductId && (
+                  <button
+                    type="button"
+                    className="adm-btn adm-btn-light"
+                    onClick={() => setActiveTab("info")}
+                  >
+                    <FiInfo /> Quay lại thông tin sản phẩm
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="adm-btn adm-btn-primary"
+                  onClick={() => handleProductSubmit()}
+                >
+                  <FiSave /> {editingProductId ? "Lưu cập nhật sản phẩm" : "Hoàn tất thêm sản phẩm"}
+                </button>
+              </div>
             </div>
 
           </div>
@@ -449,8 +567,7 @@ export default function AdminProducts({
             </thead>
             <tbody>
               {filteredProducts.map((product) => {
-                const stockTone = product.stock === 0 ? "danger" : product.stock <= 10 ? "warn" : "ok"
-                const stockText = product.stock === 0 ? "Hết hàng" : product.stock <= 10 ? "Sắp hết" : "Còn hàng"
+                const statusMeta = getStatusMeta(product.status, product.stock)
                 return (
                   <tr key={product.id}>
                     <td><strong>#{product.id}</strong></td>
@@ -460,11 +577,11 @@ export default function AdminProducts({
                     <td><span className="adm-chip">{product.series}</span></td>
                     <td className="adm-money">{toCurrency(product.price)}</td>
                     <td>{product.stock}</td>
-                    <td><span className={`adm-status2 ${stockTone}`}>{stockText}</span></td>
+                    <td><span className={`adm-status2 ${statusMeta.tone}`}>{statusMeta.text}</span></td>
                     <td>
                       <div className="adm-row-actions">
                         <button className="adm-btn adm-btn-light" onClick={() => { handleEditProduct(product); setActiveTab("info") }}><FiEdit /> Sửa</button>
-                        <button className="adm-btn adm-btn-danger" onClick={() => handleDeleteProduct(product.id)}><FiTrash2 /> Xóa</button>
+                        <button className="adm-btn adm-btn-danger" onClick={() => handleDeleteProduct(product.id)}><FiTrash2 /> {product.status === "DISCONTINUED" ? "Đã ngừng" : "Ngừng bán"}</button>
                       </div>
                     </td>
                   </tr>

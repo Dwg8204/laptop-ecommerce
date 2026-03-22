@@ -383,6 +383,50 @@ const Order = {
     },
 
     /**
+     * Cập nhật địa chỉ giao hàng cho đơn trước khi vào xử lý.
+     * @param {number} orderId - ID đơn hàng.
+     * @param {number} userId - ID người dùng sở hữu đơn.
+     * @param {number} newAddressId - ID địa chỉ mới.
+     * @param {Object} connection - Đối tượng connection nếu đang trong transaction.
+     * @returns {Promise<number>} Số dòng bị ảnh hưởng.
+     */
+    updateOrderAddress: async (orderId, userId, newAddressId, connection = db) => {
+        const [orderRows] = await connection.query(
+            'SELECT order_id, user_id, status FROM orders WHERE order_id = ? FOR UPDATE',
+            [orderId]
+        );
+
+        if (orderRows.length === 0) {
+            throw new Error('Đơn hàng không tồn tại.');
+        }
+
+        const currentOrder = orderRows[0];
+        if (parseInt(currentOrder.user_id, 10) !== parseInt(userId, 10)) {
+            throw new Error('Bạn không có quyền cập nhật địa chỉ cho đơn hàng này.');
+        }
+
+        if (!['PENDING_CONFIRMATION', 'WAITING_FOR_STOCK'].includes(currentOrder.status)) {
+            throw new Error('Chỉ có thể đổi địa chỉ khi đơn hàng chưa vào trạng thái xử lý.');
+        }
+
+        const [addressRows] = await connection.query(
+            'SELECT address_id FROM user_addresses WHERE address_id = ? AND user_id = ? LIMIT 1',
+            [newAddressId, userId]
+        );
+
+        if (addressRows.length === 0) {
+            throw new Error('Địa chỉ giao hàng không tồn tại hoặc không thuộc về người dùng này.');
+        }
+
+        const [result] = await connection.query(
+            'UPDATE orders SET address_id = ? WHERE order_id = ?',
+            [newAddressId, orderId]
+        );
+
+        return result.affectedRows;
+    },
+
+    /**
      * Cập nhật payment_id cho đơn hàng.
      * @param {number} orderId - ID của đơn hàng.
      * @param {number} paymentId - ID của payment record.

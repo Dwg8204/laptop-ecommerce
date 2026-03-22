@@ -1,17 +1,47 @@
-export default function ProductCard({
-  title = 'Laptop ASUS TUF Gaming F16',
-  price = '22.490.000đ',
-  oldPrice = '24.490.000đ',
-  discount = 'Giảm 8%',
-  specs = 'CORE i5-210H | RTX 3050 | 16GB | 512GB | 16\" WUXGA',
-  promo = 'S-Student giảm thêm 500.000đ',
-  img = 'https://via.placeholder.com/250x150',
-}) {
+import { useNavigate } from 'react-router-dom'
+import { getImageUrl } from '../config/api'
+
+export default function ProductCard({ product }) {
+  const navigate = useNavigate()
+
+  if (!product) {
+    return null
+  }
+
+  // Map API response fields to display fields
+  const title = product.product_name || 'Sản phẩm'
+  const image = getImageUrl(product.primary_product_image_url)
+  
+  // Format price
+  const minPrice = parseFloat(product.min_price || 0)
+  const maxPrice = parseFloat(product.max_price || 0)
+  const price = minPrice > 0 ? `${minPrice.toLocaleString('vi-VN')}đ` : 'Liên hệ'
+  
+  // Calculate discount percentage if both min and max have different prices
+  let discountPercent = 0
+  if (minPrice > 0 && maxPrice > minPrice) {
+    discountPercent = Math.round(((maxPrice - minPrice) / maxPrice) * 100)
+  }
+  const discount = discountPercent > 0 ? `Giảm ${discountPercent}%` : ''
+  
+  // Build specs from representative values
+  const cpu = product.representative_cpu_name || ''
+  const gpu = product.representative_gpu || ''
+  const ram = product.representative_ram_gb ? `${product.representative_ram_gb}GB` : ''
+  const storage = product.representative_storage_gb ? `${product.representative_storage_gb}GB` : ''
+  const specs = [cpu, gpu, ram, storage].filter(Boolean).join(' | ') || 'Đang cập nhật'
+
+  const handleClick = () => {
+    if (product.product_id) {
+      navigate(`/product/${product.product_id}`)
+    }
+  }
+
   return (
-    <div style={styles.card}>
+    <div style={styles.card} onClick={handleClick} role="button" tabIndex={0}>
       <div style={styles.imageWrapper}>
-        <img src={img} alt={title} style={styles.image} />
-        <div style={styles.discountBadge}>{discount}</div>
+        <img src={image} alt={title} style={styles.image} />
+        {discount && <div style={styles.discountBadge}>{discount}</div>}
         <div style={styles.installBadge}>Trả góp 0%</div>
       </div>
       <div style={styles.content}>
@@ -19,9 +49,7 @@ export default function ProductCard({
         <h3 style={styles.title}>{title}</h3>
         <div style={styles.priceWrapper}>
           <span style={styles.price}>{price}</span>
-          <span style={styles.oldPrice}>{oldPrice}</span>
         </div>
-        <div style={styles.promo}>{promo}</div>
       </div>
     </div>
   )
@@ -37,6 +65,8 @@ const styles = {
     flexDirection: 'column',
     overflow: 'hidden',
     position: 'relative',
+    cursor: 'pointer',
+    transition: 'transform 0.2s, box-shadow 0.2s',
   },
   imageWrapper: {
     position: 'relative',

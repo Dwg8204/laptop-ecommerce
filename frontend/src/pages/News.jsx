@@ -110,6 +110,10 @@ export default function News() {
     navigate('/news');
   };
 
+  const handleGoBack = () => {
+    navigate(-1);
+  };
+
   return (
     <div className="news-page">
       <Breadcrumb items={breadcrumbItems} />
@@ -117,6 +121,11 @@ export default function News() {
       <div className="news-container">
         {!id ? (
           <>
+            <button className="back-btn" onClick={handleGoBack}>
+              ← Quay lại
+            </button>
+
+            {/* Category filters */}
             {categories.length > 0 && (
               <div className="news-filters">
                 <button

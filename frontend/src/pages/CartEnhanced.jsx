@@ -1,12 +1,13 @@
 import { useCart } from '../context/CartContext'
 import { FiTrash2, FiMinus, FiPlus, FiArrowLeft, FiCreditCard, FiDollarSign, FiSmartphone, FiTag, FiX } from 'react-icons/fi'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import * as voucherApi from '../services/voucherApi'
 import * as orderApi from '../services/orderApi'
 import * as paymentApi from '../services/paymentApi'
 import * as productApi from '../services/productApi'
+import * as userProfileApi from '../services/userProfileApi'
 import { upsertOrderForUser } from '../lib/orderStorage'
 import '../styles/Cart.css'
 
@@ -30,6 +31,47 @@ export default function Cart() {
   const [voucherFeedbackType, setVoucherFeedbackType] = useState('')
   const [checkingVoucher, setCheckingVoucher] = useState(false)
   const [processingCheckout, setProcessingCheckout] = useState(false)
+  const [userAddresses, setUserAddresses] = useState([])
+  const [selectedAddressId, setSelectedAddressId] = useState('')
+  const [loadingAddresses, setLoadingAddresses] = useState(false)
+
+  const selectedAddress = useMemo(
+    () => userAddresses.find((address) => String(address.address_id) === String(selectedAddressId)) || null,
+    [userAddresses, selectedAddressId]
+  )
+
+  useEffect(() => {
+    const loadAddresses = async () => {
+      if (!user?.user_id) {
+        setUserAddresses([])
+        setSelectedAddressId('')
+        return
+      }
+
+      try {
+        setLoadingAddresses(true)
+        const response = await userProfileApi.getMyAddresses()
+        const addresses = Array.isArray(response?.data) ? response.data : []
+        setUserAddresses(addresses)
+
+        const defaultAddress = addresses.find((address) => Boolean(address.is_default))
+        if (defaultAddress?.address_id) {
+          setSelectedAddressId(String(defaultAddress.address_id))
+        } else if (addresses[0]?.address_id) {
+          setSelectedAddressId(String(addresses[0].address_id))
+        } else {
+          setSelectedAddressId('')
+        }
+      } catch {
+        setUserAddresses([])
+        setSelectedAddressId('')
+      } finally {
+        setLoadingAddresses(false)
+      }
+    }
+
+    loadAddresses()
+  }, [user?.user_id])
 
   const subtotal = getTotalPrice()
   const canApplyCurrentVoucher = appliedVoucher && subtotal >= Number(appliedVoucher.min_order_value || 0)
@@ -94,6 +136,11 @@ export default function Cart() {
       return
     }
 
+    if (!selectedAddressId) {
+      alert('Vui lòng chọn địa chỉ giao hàng trước khi thanh toán')
+      return
+    }
+
     // Hiển thị modal chọn hình thức thanh toán
     setShowPaymentModal(true)
   }
@@ -106,6 +153,11 @@ export default function Cart() {
 
     if (!user?.user_id) {
       alert('Không xác định được tài khoản đăng nhập để tạo đơn hàng')
+      return
+    }
+
+    if (!selectedAddressId) {
+      alert('Vui lòng chọn địa chỉ giao hàng trước khi thanh toán')
       return
     }
 
@@ -147,6 +199,7 @@ export default function Cart() {
 
       const orderResponse = await orderApi.createOrder({
         user_id: user.user_id,
+        address_id: Number(selectedAddressId),
         voucher_id: appliedVoucher?.voucher_id || undefined,
         order_type: 'NORMAL',
         items: resolvedItems,
@@ -172,6 +225,16 @@ export default function Cart() {
         paymentMethod: selectedPayment,
         paymentMethodLabel: paymentMethodData?.label,
         paymentStatus: 'UNPAID',
+        shippingAddress: selectedAddress
+          ? {
+              receiver_name: selectedAddress.receiver_name,
+              receiver_phone: selectedAddress.receiver_phone,
+              specific_address: selectedAddress.specific_address,
+              ward: selectedAddress.ward,
+              district: selectedAddress.district,
+              province: selectedAddress.province,
+            }
+          : null,
         voucher: appliedVoucher
           ? {
               voucher_id: appliedVoucher.voucher_id,
@@ -373,6 +436,53 @@ export default function Cart() {
                 </div>
               ) : null}
             </div>
+
+            {user ? (
+              <div className="cart-address-box">
+                <div className="cart-address-head">
+                  <label className="cart-voucher-label" style={{ marginBottom: 0 }}>Địa chỉ giao hàng</label>
+                  <button className="cart-address-manage" onClick={() => navigate('/profile')}>
+                    Quản lý địa chỉ
+                  </button>
+                </div>
+
+                {loadingAddresses ? <p className="cart-address-empty">Đang tải địa chỉ...</p> : null}
+                {!loadingAddresses && userAddresses.length === 0 ? (
+                  <div className="cart-address-empty-wrap">
+                    <p className="cart-address-empty">Bạn chưa có địa chỉ giao hàng.</p>
+                    <button className="cart-btn cart-btn-secondary" onClick={() => navigate('/profile')}>
+                      Thêm địa chỉ ngay
+                    </button>
+                  </div>
+                ) : null}
+
+                {!loadingAddresses && userAddresses.length > 0 ? (
+                  <div className="cart-address-list">
+                    {userAddresses.map((address) => (
+                      <label
+                        key={address.address_id}
+                        className={`cart-address-item ${String(selectedAddressId) === String(address.address_id) ? 'active' : ''}`}
+                      >
+                        <input
+                          type="radio"
+                          name="shipping-address"
+                          checked={String(selectedAddressId) === String(address.address_id)}
+                          onChange={() => setSelectedAddressId(String(address.address_id))}
+                        />
+                        <div>
+                          <div className="cart-address-title">
+                            <strong>{address.receiver_name}</strong>
+                            {address.is_default ? <span className="cart-address-default">Mặc định</span> : null}
+                          </div>
+                          <p>{address.receiver_phone}</p>
+                          <p>{address.specific_address}, {address.ward}, {address.district}, {address.province}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             
             <div className="summary-row">
               <span>Tổng sản phẩm:</span>
@@ -456,6 +566,14 @@ export default function Cart() {
                 <p className="payment-voucher-note">
                   Voucher {appliedVoucher.voucher_code} đang được áp dụng, giảm {toCurrency(discountAmount)}.
                 </p>
+              ) : null}
+
+              {selectedAddress ? (
+                <div className="payment-address-note">
+                  <strong>Giao đến:</strong> {selectedAddress.receiver_name} - {selectedAddress.receiver_phone}
+                  <br />
+                  {selectedAddress.specific_address}, {selectedAddress.ward}, {selectedAddress.district}, {selectedAddress.province}
+                </div>
               ) : null}
               
               <div className="payment-methods">

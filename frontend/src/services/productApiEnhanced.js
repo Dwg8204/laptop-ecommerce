@@ -3,6 +3,32 @@ import { getAuthToken } from '../lib/authToken'
 
 const API_BASE = buildApiUrl('/api/products')
 
+const appendFiles = (formData, fieldName, files) => {
+  if (!files) return
+
+  if (files instanceof FileList) {
+    Array.from(files).forEach((file) => {
+      if (file instanceof File) {
+        formData.append(fieldName, file)
+      }
+    })
+    return
+  }
+
+  if (Array.isArray(files)) {
+    files.forEach((file) => {
+      if (file instanceof File) {
+        formData.append(fieldName, file)
+      }
+    })
+    return
+  }
+
+  if (files instanceof File) {
+    formData.append(fieldName, files)
+  }
+}
+
 /**
  * Get all products with pagination
  * @param {Object} params - Query parameters (page, limit, sortBy, order, search, etc.)
@@ -15,9 +41,16 @@ export const getAllProducts = async (params = {}) => {
         queryParams.append(key, value)
       }
     })
+    queryParams.append('_ts', Date.now().toString())
 
     const url = `${API_BASE}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache'
+      }
+    })
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -37,7 +70,14 @@ export const getAllProducts = async (params = {}) => {
  */
 export const getProductById = async (id) => {
   try {
-    const response = await fetch(`${API_BASE}/${id}`)
+    const url = `${API_BASE}/${id}?_ts=${Date.now()}`
+    const response = await fetch(url, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache'
+      }
+    })
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -84,38 +124,12 @@ export const createProduct = async (productData) => {
     }
 
     // Add product main images
-    if (productData.productImages) {
-      if (productData.productImages instanceof FileList) {
-        Array.from(productData.productImages).forEach(file => {
-          formData.append('productImages', file)
-        })
-      } else if (Array.isArray(productData.productImages)) {
-        productData.productImages.forEach((file) => {
-          if (file instanceof File) {
-            formData.append('productImages', file)
-          }
-        })
-      } else if (productData.productImages instanceof File) {
-        formData.append('productImages', productData.productImages)
-      }
-    }
+    appendFiles(formData, 'productImages', productData.productImages)
 
     // Add variant images
     if (productData.variantImages && Array.isArray(productData.variantImages)) {
       productData.variantImages.forEach((variantImgs, index) => {
-        if (variantImgs instanceof FileList) {
-          Array.from(variantImgs).forEach(file => {
-            formData.append(`variant_${index}_images`, file)
-          })
-        } else if (Array.isArray(variantImgs)) {
-          variantImgs.forEach((file) => {
-            if (file instanceof File) {
-              formData.append(`variant_${index}_images`, file)
-            }
-          })
-        } else if (variantImgs instanceof File) {
-          formData.append(`variant_${index}_images`, variantImgs)
-        }
+        appendFiles(formData, `variant_${index}_images`, variantImgs)
       })
     }
 
@@ -159,72 +173,47 @@ export const updateProduct = async (id, productData) => {
   try {
     const formData = new FormData()
 
-    // Add updated fields
-    if (productData.product_name !== undefined) {
-      formData.append('product_name', productData.product_name)
-    }
-    if (productData.brand_id !== undefined) {
-      formData.append('brand_id', productData.brand_id)
-    }
-    if (productData.category_id !== undefined) {
-      formData.append('category_id', productData.category_id)
-    }
-    if (productData.description_html !== undefined) {
-      formData.append('description_html', productData.description_html)
-    }
-    if (productData.highlight_features !== undefined) {
-      formData.append('highlight_features', productData.highlight_features)
-    }
-    if (productData.screen_size !== undefined) {
-      formData.append('screen_size', productData.screen_size)
-    }
-    if (productData.weight_kg !== undefined) {
-      formData.append('weight_kg', productData.weight_kg)
-    }
-    if (productData.os !== undefined) {
-      formData.append('os', productData.os)
-    }
-    if (productData.is_active !== undefined) {
-      formData.append('is_active', productData.is_active ? 1 : 0)
-    }
+    const simpleFields = [
+      'product_name',
+      'brand_id',
+      'category_id',
+      'description_html',
+      'highlight_features',
+      'screen_size',
+      'weight_kg',
+      'os',
+      'primary_product_image_id',
+    ]
 
-    // Add variants if provided
-    if (productData.variants) {
-      formData.append('variants', JSON.stringify(productData.variants))
-    }
-
-    // Add new images if provided
-    if (productData.productImages) {
-      if (productData.productImages instanceof FileList) {
-        Array.from(productData.productImages).forEach(file => {
-          formData.append('productImages', file)
-        })
-      } else if (Array.isArray(productData.productImages)) {
-        productData.productImages.forEach((file) => {
-          if (file instanceof File) {
-            formData.append('productImages', file)
-          }
-        })
-      } else if (productData.productImages instanceof File) {
-        formData.append('productImages', productData.productImages)
+    simpleFields.forEach((field) => {
+      if (productData[field] !== undefined && productData[field] !== null && productData[field] !== '') {
+        formData.append(field, productData[field])
       }
+    })
+
+    if (Array.isArray(productData.delete_image_ids) && productData.delete_image_ids.length > 0) {
+      formData.append('delete_image_ids', JSON.stringify(productData.delete_image_ids))
     }
 
-    if (productData.variantImages && Array.isArray(productData.variantImages)) {
-      productData.variantImages.forEach((variantImgs, index) => {
-        if (variantImgs instanceof FileList) {
-          Array.from(variantImgs).forEach(file => {
-            formData.append(`variant_${index}_images`, file)
-          })
-        } else if (Array.isArray(variantImgs)) {
-          variantImgs.forEach((file) => {
-            if (file instanceof File) {
-              formData.append(`variant_${index}_images`, file)
-            }
-          })
-        } else if (variantImgs instanceof File) {
-          formData.append(`variant_${index}_images`, variantImgs)
-        }
+    if (Array.isArray(productData.variants_to_update) && productData.variants_to_update.length > 0) {
+      formData.append('variants_to_update', JSON.stringify(productData.variants_to_update))
+    }
+
+    if (Array.isArray(productData.variants_to_create) && productData.variants_to_create.length > 0) {
+      formData.append('variants_to_create', JSON.stringify(productData.variants_to_create))
+    }
+
+    appendFiles(formData, 'newProductImages', productData.newProductImages)
+
+    if (Array.isArray(productData.variantImagesToUpdate)) {
+      productData.variantImagesToUpdate.forEach((variantImgs, index) => {
+        appendFiles(formData, `newVariant_${index}_images_update`, variantImgs)
+      })
+    }
+
+    if (Array.isArray(productData.variantImagesToCreate)) {
+      productData.variantImagesToCreate.forEach((variantImgs, index) => {
+        appendFiles(formData, `newVariant_${index}_images_create`, variantImgs)
       })
     }
 
@@ -243,7 +232,10 @@ export const updateProduct = async (id, productData) => {
     const data = await response.json()
 
     if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
+      const detail = Array.isArray(data?.errors) && data.errors.length > 0
+        ? `: ${data.errors.join(', ')}`
+        : ''
+      throw new Error((data.error || data.message || `HTTP ${response.status}: ${response.statusText}`) + detail)
     }
 
     return data
@@ -298,7 +290,7 @@ export const addVariantToProduct = async (productId, variantData, variantImages 
       {
         sku: variantData.sku,
         cpu_name: variantData.cpu_name,
-        cpu_benchmark_score: variantData.cpu_benchmark_score ?? null,
+        cpu_benchmark_score: variantData.cpu_benchmark_score,
         gpu: variantData.gpu,
         ram_gb: variantData.ram_gb,
         ram_type: variantData.ram_type,
@@ -311,17 +303,7 @@ export const addVariantToProduct = async (productId, variantData, variantImages 
       },
     ]))
 
-    if (variantImages instanceof FileList) {
-      Array.from(variantImages).forEach((file) => {
-        formData.append('newVariant_0_images_create', file)
-      })
-    } else if (Array.isArray(variantImages)) {
-      variantImages.forEach((file) => {
-        if (file instanceof File) {
-          formData.append('newVariant_0_images_create', file)
-        }
-      })
-    }
+    appendFiles(formData, 'newVariant_0_images_create', variantImages)
 
     const token = getAuthToken()
     const headers = {}
@@ -369,17 +351,7 @@ export const updateProductVariant = async (productId, variantId, variantData, va
       },
     ]))
 
-    if (variantImages instanceof FileList) {
-      Array.from(variantImages).forEach((file) => {
-        formData.append('newVariant_0_images_update', file)
-      })
-    } else if (Array.isArray(variantImages)) {
-      variantImages.forEach((file) => {
-        if (file instanceof File) {
-          formData.append('newVariant_0_images_update', file)
-        }
-      })
-    }
+    appendFiles(formData, 'newVariant_0_images_update', variantImages)
 
     const token = getAuthToken()
     const headers = {}
