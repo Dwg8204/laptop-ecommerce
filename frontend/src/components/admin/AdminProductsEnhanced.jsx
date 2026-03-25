@@ -33,6 +33,8 @@ export default function AdminProducts({
   handleProductSubmit,
   handleEditProduct,
   handleDeleteProduct,
+  productNotice,
+  clearProductNotice,
   brands,
   categories,
   loadingBrands,
@@ -81,7 +83,7 @@ export default function AdminProducts({
   }
 
   const emptyVariantFormLocal = {
-    sku: "", cpu: "", gpu: "", ram: "", ramType: "", storage: "",
+    sku: "", cpu: "", cpuBenchmarkScore: "", gpu: "", ram: "", ramType: "", storage: "",
     color: "", originalPrice: "", discountPrice: "", stock: "",
     status: "IN_STOCK",
     imageFiles: [], imagePreviews: [],
@@ -127,6 +129,13 @@ export default function AdminProducts({
           <h3>{editingProductId ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}</h3>
           <span className="adm-pill">{editingProductId ? "Edit" : "New"}</span>
         </div>
+
+        {productNotice ? (
+          <div className={`adm-alert adm-alert-${productNotice.type === "success" ? "success" : "error"} adm-alert-floating`} role="status" aria-live="polite">
+            <span>{productNotice.message}</span>
+            <button type="button" className="adm-alert-close" onClick={clearProductNotice}>×</button>
+          </div>
+        ) : null}
 
         {/* Tab bar */}
         <div className="adm-tabs">
@@ -268,6 +277,16 @@ export default function AdminProducts({
             </div>
 
             <div className="adm-form-row">
+              <label>CPU Benchmark Score</label>
+              <input placeholder="Ưu tiên lấy từ phiên bản" value={productForm.cpuBenchmarkScore} onChange={(e) => setProductForm((prev) => ({ ...prev, cpuBenchmarkScore: e.target.value }))} />
+            </div>
+
+            <div className="adm-form-row">
+              <label>GPU</label>
+              <input placeholder="Ưu tiên lấy từ phiên bản" value={productForm.graphics} onChange={(e) => setProductForm((prev) => ({ ...prev, graphics: e.target.value }))} />
+            </div>
+
+            <div className="adm-form-row">
               <label>RAM</label>
               <input type="text" placeholder="Ưu tiên lấy từ phiên bản" value={productForm.ram} onChange={(e) => setProductForm((prev) => ({ ...prev, ram: e.target.value }))} />
             </div>
@@ -359,7 +378,7 @@ export default function AdminProducts({
               <h4 className="adm-variant-section-title">
                 {editingVariantIndex >= 0
                   ? `✏️ Đang sửa phiên bản: ${productVariants[editingVariantIndex]?.sku || "#" + (editingVariantIndex + 1)}`
-                  : "➕ Thêm phiên bản mới"}
+                  : " Thêm phiên bản mới"}
               </h4>
 
               <div className="adm-variant-grid">
@@ -374,6 +393,10 @@ export default function AdminProducts({
                 <div>
                   <label>CPU *</label>
                   <input type="text" placeholder="VD: Intel Core i7-13620H" value={variantForm.cpu} onChange={(e) => setVariantForm((prev) => ({ ...prev, cpu: e.target.value }))} />
+                </div>
+                <div>
+                  <label>CPU Benchmark Score *</label>
+                  <input type="text" placeholder="VD: 12345" value={variantForm.cpuBenchmarkScore} onChange={(e) => setVariantForm((prev) => ({ ...prev, cpuBenchmarkScore: e.target.value }))} />
                 </div>
                 <div>
                   <label>GPU *</label>

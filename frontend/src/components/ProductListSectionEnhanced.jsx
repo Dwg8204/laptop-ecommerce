@@ -207,7 +207,7 @@ export default function ProductListSection({ filters, sortBy, selectedCategory =
                   alert(`Đã thêm "${item.name}" vào giỏ hàng!`)
                 }}
               >
-                <FiShoppingCart /> Thêm vào giỏ
+                <FiShoppingCart /> Thêm vào giỏ hàng
               </button>
             </div>
           ))}

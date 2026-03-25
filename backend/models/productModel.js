@@ -472,8 +472,8 @@ const Product = {
             // 4. Thêm các phiên bản (variants) và ảnh của từng variant
             const variantInsertQuery = `
                 INSERT INTO product_variants
-                (product_id, sku, cpu_name, cpu_benchmark_score, gpu, ram_gb, storage_gb, color_name, original_price, discount_price, stock_quantity, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (product_id, sku, cpu_name, cpu_benchmark_score, gpu, ram_gb, ram_type, storage_gb, color_name, original_price, discount_price, stock_quantity, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const variantImageInsertQuery = `INSERT INTO product_images (product_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)`;
 
@@ -485,6 +485,7 @@ const Product = {
                     variant.cpu_benchmark_score || null,
                     variant.gpu || null,
                     variant.ram_gb,
+                    variant.ram_type || null,
                     variant.storage_gb,
                     variant.color_name,
                     variant.original_price,
@@ -646,7 +647,7 @@ const Product = {
                 const deleteVariantImageIds = variantUpdate.deleteImageIds || [];
                 const primaryVariantImageId = variantUpdate.primaryImageId;
 
-                const allowedVariantFields = ['sku', 'cpu_name', 'cpu_benchmark_score', 'gpu', 'ram_gb', 'storage_gb', 'color_name', 'original_price', 'discount_price', 'stock_quantity', 'status'];
+                const allowedVariantFields = ['sku', 'cpu_name', 'cpu_benchmark_score', 'gpu', 'ram_gb', 'ram_type', 'storage_gb', 'color_name', 'original_price', 'discount_price', 'stock_quantity', 'status'];
                 const variantFieldsToUpdate = [];
                 const variantValues = [];
 
@@ -704,8 +705,8 @@ const Product = {
             // 7. Thêm các variants mới
             const variantInsertQuery = `
                 INSERT INTO product_variants
-                (product_id, sku, cpu_name, cpu_benchmark_score, gpu, ram_gb, storage_gb, color_name, original_price, discount_price, stock_quantity, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (product_id, sku, cpu_name, cpu_benchmark_score, gpu, ram_gb, ram_type, storage_gb, color_name, original_price, discount_price, stock_quantity, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const variantImageInsertQuery = `INSERT INTO product_images (product_id, variant_id, image_url, is_primary) VALUES (?, ?, ?, ?)`;
 
@@ -717,6 +718,7 @@ const Product = {
                     variant.cpu_benchmark_score || null,
                     variant.gpu || null,
                     variant.ram_gb,
+                    variant.ram_type || null,
                     variant.storage_gb,
                     variant.color_name,
                     variant.original_price,

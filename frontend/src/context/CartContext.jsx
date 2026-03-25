@@ -43,7 +43,8 @@ function mapApiItemToLocal(apiItem) {
     config,
     price,
     quantity: apiItem.quantity,
-    image: apiItem.primary_variant_image_url || '',
+    // Luôn thêm timestamp để bypass cache ảnh cũ
+    image: apiItem.primary_variant_image_url ? `${apiItem.primary_variant_image_url}?t=${Date.now()}` : '',
     // Giữ stock để validate tại client
     stockQuantity: apiItem.variant_stock_quantity,
     variantStatus: apiItem.variant_status,
@@ -194,6 +195,13 @@ export function CartProvider({ children }) {
       const res = await fetch(buildApiUrl(`/api/cart/remove/${variantId}?${query}`), { method: 'DELETE' })
       const json = await res.json()
       if (!json.success) throw new Error(json.message)
+      // Nếu backend trả về danh sách items, đồng bộ lại state
+      if (json.data && Array.isArray(json.data.items)) {
+        setCart(json.data.items.map(mapApiItemToLocal))
+        localStorage.setItem('laptopCart', JSON.stringify(json.data.items.map(mapApiItemToLocal)))
+      } else {
+        await fetchCart()
+      }
     } catch (err) {
       console.error('CartContext removeFromCart API error:', err)
       await fetchCart() // Rollback: sync lại từ server
@@ -226,6 +234,13 @@ export function CartProvider({ children }) {
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.message)
+      // Nếu backend trả về danh sách items, đồng bộ lại state
+      if (json.data && Array.isArray(json.data.items)) {
+        setCart(json.data.items.map(mapApiItemToLocal))
+        localStorage.setItem('laptopCart', JSON.stringify(json.data.items.map(mapApiItemToLocal)))
+      } else {
+        await fetchCart()
+      }
     } catch (err) {
       console.error('CartContext updateQuantity API error:', err)
       await fetchCart() // Rollback: sync lại từ server

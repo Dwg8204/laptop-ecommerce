@@ -107,7 +107,7 @@ const mapApiProductToUi = (product) => {
 
 const mapVariantInputToApi = (variantInput) => {
   const stockQuantity = parseInt(variantInput.stock ?? variantInput.stock_quantity ?? 0, 10) || 0
-  const rawBenchmark = variantInput.cpu_benchmark_score
+  const rawBenchmark = variantInput.cpu_benchmark_score ?? variantInput.cpuBenchmarkScore
   const parsedBenchmark =
     rawBenchmark === '' || rawBenchmark === null || rawBenchmark === undefined
       ? undefined
@@ -266,33 +266,21 @@ export function ProductProvider({ children }) {
 
       if (Array.isArray(productData.productVariants) && productData.productVariants.length > 0) {
         variants = productData.productVariants.map((v, index) => {
-          const ramValue = parseInt(v.ram)
-          const storageValue = parseInt(v.storage)
-          const originalPrice = parseFloat(v.originalPrice)
-          const discountPrice = v.discountPrice ? parseFloat(v.discountPrice) : undefined
-          const stockQuantity = parseInt(v.stock) || 0
-          const normalizedSku = String(v.sku || '').trim()
-
-          if (!normalizedSku || !v.color || !v.cpu || !v.gpu || isNaN(ramValue) || isNaN(storageValue) || isNaN(originalPrice)) {
+          // Validate các trường bắt buộc trước khi map
+          if (!v.sku || !v.color || !v.cpu || !v.gpu || v.ram === undefined || v.storage === undefined || v.originalPrice === undefined) {
             throw new Error(`Phiên bản #${index + 1} chưa hợp lệ. Vui lòng kiểm tra lại thông tin.`)
           }
           if (!Array.isArray(v.imageFiles) || v.imageFiles.length === 0) {
             throw new Error(`Phiên bản #${index + 1} cần tối thiểu 1 ảnh.`)
           }
-
-          return {
-            sku: normalizedSku,
-            ram_gb: ramValue,
-            ram_type: v.ramType || 'DDR4',
-            storage_gb: storageValue,
-            cpu_name: v.cpu,
-            gpu: v.gpu,
-            color_name: v.color.trim(),
-            original_price: originalPrice,
-            discount_price: discountPrice,
-            stock_quantity: stockQuantity,
-            status: stockQuantity > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK'
+          if (v.cpu_benchmark_score === undefined && (v.cpuBenchmarkScore === undefined || v.cpuBenchmarkScore === null || v.cpuBenchmarkScore === '' || isNaN(Number(v.cpuBenchmarkScore)))) {
+            throw new Error(`Phiên bản #${index + 1} cần nhập CPU Benchmark Score hợp lệ.`)
           }
+          if (!v.ramType || typeof v.ramType !== 'string' || !v.ramType.trim()) {
+            throw new Error(`Phiên bản #${index + 1} cần nhập loại RAM (ram_type).`)
+          }
+          // Sử dụng mapVariantInputToApi để map đầy đủ các trường
+          return mapVariantInputToApi(v)
         })
       } else {
         if (!productData.ram) {
@@ -497,17 +485,19 @@ export function ProductProvider({ children }) {
       setLoading(true)
       setError(null)
 
-      const ramValue = parseInt(variantInput.ram)
-      const storageValue = parseInt(variantInput.storage)
-      const originalPrice = parseFloat(variantInput.originalPrice)
-      const discountPrice = variantInput.discountPrice ? parseFloat(variantInput.discountPrice) : null
-      const stockQuantity = parseInt(variantInput.stock) || 0
-      const normalizedSku = String(variantInput.sku || '').trim()
+      const normalizedVariant = mapVariantInputToApi(variantInput)
+      const ramValue = normalizedVariant.ram_gb
+      const storageValue = normalizedVariant.storage_gb
+      const originalPrice = normalizedVariant.original_price
+      const discountPrice = normalizedVariant.discount_price ?? null
+      const stockQuantity = normalizedVariant.stock_quantity
+      const normalizedSku = normalizedVariant.sku
+      const cpuBenchmarkScore = normalizedVariant.cpu_benchmark_score
 
-      if (!normalizedSku || !variantInput.color || !variantInput.cpu || !variantInput.gpu || isNaN(ramValue) || isNaN(storageValue) || isNaN(originalPrice)) {
+      if (!normalizedSku || !normalizedVariant.color_name || !normalizedVariant.cpu_name || !normalizedVariant.gpu || cpuBenchmarkScore === undefined || isNaN(ramValue) || isNaN(storageValue) || isNaN(originalPrice)) {
         throw new Error('Thông tin phiên bản chưa đầy đủ hoặc không hợp lệ')
       }
-      if (ramValue <= 0 || storageValue <= 0 || originalPrice <= 0) {
+      if (cpuBenchmarkScore <= 0 || ramValue <= 0 || storageValue <= 0 || originalPrice <= 0) {
         throw new Error('RAM, ổ cứng và giá gốc phải lớn hơn 0')
       }
       if (discountPrice !== null && discountPrice >= originalPrice) {
@@ -517,19 +507,7 @@ export function ProductProvider({ children }) {
         throw new Error('Phiên bản cần tối thiểu 1 ảnh')
       }
 
-      const variantData = {
-        sku: normalizedSku,
-        cpu_name: variantInput.cpu,
-        gpu: variantInput.gpu,
-        ram_gb: ramValue,
-        ram_type: variantInput.ramType || 'DDR4',
-        storage_gb: storageValue,
-        color_name: variantInput.color,
-        original_price: originalPrice,
-        discount_price: discountPrice ?? undefined,
-        stock_quantity: stockQuantity,
-        status: normalizeStatusFromStock(variantInput.status, stockQuantity)
-      }
+      const variantData = normalizedVariant
 
       const response = await productApi.addVariantToProduct(productId, variantData, variantImages)
 
@@ -567,36 +545,26 @@ export function ProductProvider({ children }) {
       setError(null)
 
       const variantId = parseInt(variantInput.variant_id)
-      const ramValue = parseInt(variantInput.ram)
-      const storageValue = parseInt(variantInput.storage)
-      const originalPrice = parseFloat(variantInput.originalPrice)
-      const discountPrice = variantInput.discountPrice ? parseFloat(variantInput.discountPrice) : null
-      const stockQuantity = parseInt(variantInput.stock) || 0
-      const normalizedSku = String(variantInput.sku || '').trim()
+      const normalizedVariant = mapVariantInputToApi(variantInput)
+      const ramValue = normalizedVariant.ram_gb
+      const storageValue = normalizedVariant.storage_gb
+      const originalPrice = normalizedVariant.original_price
+      const discountPrice = normalizedVariant.discount_price ?? null
+      const stockQuantity = normalizedVariant.stock_quantity
+      const normalizedSku = normalizedVariant.sku
+      const cpuBenchmarkScore = normalizedVariant.cpu_benchmark_score
 
-      if (!variantId || !normalizedSku || !variantInput.color || !variantInput.cpu || !variantInput.gpu || isNaN(ramValue) || isNaN(storageValue) || isNaN(originalPrice)) {
+      if (!variantId || !normalizedSku || !normalizedVariant.color_name || !normalizedVariant.cpu_name || !normalizedVariant.gpu || cpuBenchmarkScore === undefined || isNaN(ramValue) || isNaN(storageValue) || isNaN(originalPrice)) {
         throw new Error('Thông tin phiên bản chưa đầy đủ hoặc không hợp lệ')
       }
-      if (ramValue <= 0 || storageValue <= 0 || originalPrice <= 0) {
+      if (cpuBenchmarkScore <= 0 || ramValue <= 0 || storageValue <= 0 || originalPrice <= 0) {
         throw new Error('RAM, ổ cứng và giá gốc phải lớn hơn 0')
       }
       if (discountPrice !== null && discountPrice >= originalPrice) {
         throw new Error('Giá khuyến mãi phải nhỏ hơn giá gốc')
       }
 
-      const variantData = {
-        sku: normalizedSku,
-        cpu_name: variantInput.cpu,
-        gpu: variantInput.gpu,
-        ram_gb: ramValue,
-        ram_type: variantInput.ramType || 'DDR4',
-        storage_gb: storageValue,
-        color_name: variantInput.color,
-        original_price: originalPrice,
-        discount_price: discountPrice ?? undefined,
-        stock_quantity: stockQuantity,
-        status: normalizeStatusFromStock(variantInput.status, stockQuantity)
-      }
+      const variantData = normalizedVariant
 
       const response = await productApi.updateProductVariant(productId, variantId, variantData, variantImages)
       if (response?.success) {

@@ -87,6 +87,7 @@ const createEmptyProductForm = () => ({
   ram: "",
   ramType: "",
   cpu: "",
+  cpuBenchmarkScore: "",
   screenSize: "",
   weightKg: "",
   os: "",
@@ -109,6 +110,7 @@ const createEmptyProductForm = () => ({
 const createEmptyVariantForm = () => ({
   sku: "",
   cpu: "",
+  cpuBenchmarkScore: "",
   gpu: "",
   ram: "",
   ramType: "",
@@ -156,6 +158,7 @@ export default function Admin() {
   const [productVariants, setProductVariants] = useState([])
   const [editingVariantIndex, setEditingVariantIndex] = useState(-1)
   const [variantForm, setVariantForm] = useState(createEmptyVariantForm())
+  const [productNotice, setProductNotice] = useState(null)
 
   const emptyVariantForm = createEmptyVariantForm()
 
@@ -196,6 +199,20 @@ export default function Admin() {
   useEffect(() => {
     fetchBrandsAndCategories()
   }, [])
+
+  useEffect(() => {
+    if (!productNotice) return undefined
+
+    const timeoutId = window.setTimeout(() => {
+      setProductNotice(null)
+    }, 3500)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [productNotice])
+
+  const showProductNotice = (type, message) => {
+    setProductNotice({ type, message })
+  }
 
   const loadCategories = async () => {
     try {
@@ -428,15 +445,15 @@ export default function Admin() {
 
     // Validate brand and category selection
     if (!productForm.brand_id || productForm.brand_id === '') {
-      alert('Vui lòng chọn thương hiệu')
+      showProductNotice('error', 'Vui lòng chọn thương hiệu')
       return
     }
     if (!productForm.category_id || productForm.category_id === '') {
-      alert('Vui lòng chọn danh mục')
+      showProductNotice('error', 'Vui lòng chọn danh mục')
       return
     }
     if (!editingProductId && (!productForm.imageFiles || productForm.imageFiles.length === 0)) {
-      alert('Vui lòng upload hình ảnh sản phẩm')
+      showProductNotice('error', 'Vui lòng upload hình ảnh sản phẩm')
       return
     }
 
@@ -445,7 +462,7 @@ export default function Admin() {
     if (!editingProductId && workingVariants.length === 0) {
       const normalizedSku = String(productForm.sku || '').trim()
       if (!normalizedSku) {
-        alert('Vui lòng nhập SKU cho sản phẩm mới')
+        showProductNotice('error', 'Vui lòng nhập SKU cho sản phẩm mới')
         return
       }
 
@@ -458,6 +475,7 @@ export default function Admin() {
           sku: normalizedSku,
           color: String(productForm.color || '').trim() || 'Mặc định',
           cpu: productForm.cpu || 'Đang cập nhật',
+          cpuBenchmarkScore: productForm.cpuBenchmarkScore || "",
           gpu: productForm.graphics || 'Đang cập nhật',
           ram: productForm.ram || '8',
           ramType: productForm.ramType || 'DDR4',
@@ -473,7 +491,7 @@ export default function Admin() {
     }
 
     if (!editingProductId && workingVariants.some((variant) => !variant.imageFiles || variant.imageFiles.length === 0)) {
-      alert('Mỗi phiên bản sản phẩm phải có tối thiểu 1 ảnh')
+      showProductNotice('error', 'Mỗi phiên bản sản phẩm phải có tối thiểu 1 ảnh')
       return
     }
 
@@ -485,6 +503,7 @@ export default function Admin() {
     const baseRamType = firstVariant?.ramType || productForm.ramType
     const baseStorage = firstVariant?.storage || productForm.storage
     const baseCpu = firstVariant?.cpu || productForm.cpu
+    const baseCpuBenchmarkScore = firstVariant?.cpuBenchmarkScore || productForm.cpuBenchmarkScore
     const baseGraphics = firstVariant?.gpu || productForm.graphics
     const baseStock = firstVariant ? Number(firstVariant.stock || 0) : Number(productForm.stock)
 
@@ -502,6 +521,7 @@ export default function Admin() {
       return {
         ...variant,
         cpu: productForm.cpu || variant.cpu,
+        cpuBenchmarkScore: productForm.cpuBenchmarkScore || variant.cpuBenchmarkScore,
         gpu: productForm.graphics || variant.gpu,
         color: productForm.color || variant.color,
         ram: productForm.ram || variant.ram,
@@ -529,6 +549,7 @@ export default function Admin() {
       ram: baseRam,
       ramType: baseRamType,
       cpu: baseCpu,
+      cpuBenchmarkScore: baseCpuBenchmarkScore,
       screenSize: productForm.screenSize,
       weightKg: productForm.weightKg,
       os: productForm.os,
@@ -553,8 +574,10 @@ export default function Admin() {
     try {
       if (editingProductId) {
         await updateProduct(editingProductId, payload)
+        showProductNotice('success', 'Cập nhật sản phẩm thành công')
       } else {
         await addProduct(payload)
+        showProductNotice('success', 'Thêm sản phẩm thành công')
       }
 
       // Clear form on success
@@ -565,18 +588,22 @@ export default function Admin() {
       setEditingProductId("")
     } catch (error) {
       console.error('Error submitting product:', error)
-      alert(`Lỗi: ${error.message}`)
+      showProductNotice('error', error.message || 'Không thể lưu sản phẩm')
     }
   }
 
   const handleAddVariant = async () => {
     if (!variantForm.sku || !variantForm.color || !variantForm.cpu || !variantForm.gpu || !variantForm.ram || !variantForm.storage || !variantForm.originalPrice) {
-      alert('Vui lòng điền đầy đủ SKU, màu và thông tin phiên bản')
+      showProductNotice('error', 'Vui lòng điền đầy đủ SKU, màu và thông tin phiên bản')
+      return
+    }
+    if (!variantForm.ramType) {
+      showProductNotice('error', 'Vui lòng chọn loại RAM cho phiên bản')
       return
     }
     const previewCount = variantForm.imagePreviews?.length || 0
     if ((!variantForm.imageFiles || variantForm.imageFiles.length === 0) && previewCount === 0) {
-      alert('Mỗi phiên bản cần tối thiểu 1 ảnh')
+      showProductNotice('error', 'Mỗi phiên bản cần tối thiểu 1 ảnh')
       return
     }
 
@@ -596,9 +623,9 @@ export default function Admin() {
             ...newVariant,
             variant_id: existingVariant.variant_id,
           }, newVariant.imageFiles || [])
-          alert('Đã cập nhật phiên bản trong cơ sở dữ liệu thành công')
+          showProductNotice('success', 'Đã cập nhật phiên bản thành công')
         } catch (error) {
-          alert(`Không thể cập nhật phiên bản: ${error.message}`)
+          showProductNotice('error', `Không thể cập nhật phiên bản: ${error.message}`)
           return
         }
       }
@@ -617,13 +644,16 @@ export default function Admin() {
       if (editingProductId) {
         try {
           await addVariantToProduct(editingProductId, newVariant, newVariant.imageFiles || [])
-          alert('Đã thêm phiên bản vào cơ sở dữ liệu thành công')
+          showProductNotice('success', 'Đã thêm phiên bản thành công')
         } catch (error) {
-          alert(`Không thể thêm phiên bản: ${error.message}`)
+          showProductNotice('error', `Không thể thêm phiên bản: ${error.message}`)
           return
         }
       }
       setProductVariants((prev) => [...prev, newVariant])
+      if (!editingProductId) {
+        showProductNotice('success', 'Đã thêm phiên bản vào danh sách')
+      }
     }
 
     setVariantForm(createEmptyVariantForm())
@@ -645,9 +675,9 @@ export default function Admin() {
     if (editingProductId && variant?.variant_id) {
       try {
         await removeVariantFromProduct(editingProductId, variant.variant_id)
-        alert(`Đã ngừng kinh doanh phiên bản "${label}" thành công`)
+        showProductNotice('success', `Đã cập nhật trạng thái phiên bản "${label}"`)
       } catch (error) {
-        alert(`Không thể xóa phiên bản: ${error.message}`)
+        showProductNotice('error', `Không thể xóa phiên bản: ${error.message}`)
         return
       }
     }
@@ -686,6 +716,7 @@ export default function Admin() {
         ram: preferredVariant?.ram_gb != null ? String(preferredVariant.ram_gb) : product.ram,
         ramType: preferredVariant?.ram_type || product.ramType || "",
         cpu: preferredVariant?.cpu_name || product.cpu,
+        cpuBenchmarkScore: preferredVariant?.cpu_benchmark_score != null ? String(preferredVariant.cpu_benchmark_score) : "",
         screenSize: productDetail?.screen_size != null ? String(productDetail.screen_size) : String(product.screenSize || "").replace(/[^\d.]/g, ""),
         weightKg: productDetail?.weight_kg != null ? String(productDetail.weight_kg) : product.weightKg || "",
         os: String(productDetail?.os || product.os || "").trim(),
@@ -711,6 +742,7 @@ export default function Admin() {
           variant_id: variant.variant_id,
           sku: variant.sku || "",
           cpu: variant.cpu_name || "",
+          cpuBenchmarkScore: variant.cpu_benchmark_score != null ? String(variant.cpu_benchmark_score) : "",
           gpu: variant.gpu || "",
           ram: variant.ram_gb != null ? String(variant.ram_gb) : "",
           ramType: variant.ram_type || preferredVariant?.ram_type || product.ramType || "",
@@ -743,6 +775,7 @@ export default function Admin() {
         ram: product.ram,
         ramType: product.ramType || "",
         cpu: product.cpu,
+        cpuBenchmarkScore: "",
         screenSize: String(product.screenSize || "").replace(/[^\d.]/g, ""),
         weightKg: product.weightKg || "",
         os: product.os || "",
@@ -760,7 +793,7 @@ export default function Admin() {
         installment: product.installment || "Trả góp 0%",
         newArrival: product.newArrival || false,
       })
-      alert('Không thể tải danh sách phiên bản chi tiết, bạn vẫn có thể chỉnh sửa thông tin cơ bản của sản phẩm.')
+      showProductNotice('error', 'Không thể tải đầy đủ danh sách phiên bản, nhưng bạn vẫn có thể sửa thông tin cơ bản.')
     }
 
     setActiveModule("products")
@@ -942,6 +975,8 @@ export default function Admin() {
         handleProductSubmit={handleProductSubmit}
         handleEditProduct={handleEditProduct}
         handleDeleteProduct={handleDeleteProduct}
+        productNotice={productNotice}
+        clearProductNotice={() => setProductNotice(null)}
         brands={brands}
         categories={categories}
         loadingBrands={loadingBrands}
