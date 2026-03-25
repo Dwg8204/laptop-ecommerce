@@ -1,5 +1,18 @@
-import { useState } from 'react'
-import { FiFilter, FiTruck, FiBox, FiDollarSign, FiChevronDown, FiInfo, FiStar, FiTag, FiArrowUp, FiArrowDown, FiX } from 'react-icons/fi'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  FiFilter,
+  FiTruck,
+  FiBox,
+  FiDollarSign,
+  FiChevronDown,
+  FiInfo,
+  FiStar,
+  FiTag,
+  FiArrowUp,
+  FiArrowDown,
+  FiX,
+} from 'react-icons/fi'
 import '../styles/FilterBar.css'
 
 const filterOptions = {
@@ -9,7 +22,7 @@ const filterOptions = {
   screenSize: ['13 inch', '14 inch', '15.6 inch', '16 inch', '17 inch'],
   resolution: ['HD (1366x768)', 'Full HD (1920x1080)', '2K (2560x1440)', '4K (3840x2160)'],
   graphics: ['Intel UHD', 'Intel Iris Xe', 'NVIDIA GTX 1650', 'NVIDIA RTX 3050', 'NVIDIA RTX 4050', 'NVIDIA RTX 4060'],
-  features: ['Màn hình cảm ứng', 'Bàn phím có đèn', 'Chống nước', 'Mỏng nhẹ', 'Pin trâu'],
+  features: ['Màn hình cảm ứng', 'Bàn phím có đèn', 'Chống nước', 'Nhẹ', 'Pin trâu'],
   ai: ['Intel AI', 'NVIDIA AI', 'AMD AI'],
   brand: ['ASUS', 'Dell', 'HP', 'Lenovo', 'Acer', 'MSI', 'Apple'],
   series: ['Gaming', 'Văn phòng', 'Đồ họa', 'Cao cấp', 'Sinh viên'],
@@ -60,6 +73,61 @@ export default function FilterBar({ onFilterChange }) {
     series: [],
   })
   const [sortBy, setSortBy] = useState('popular')
+  const [dropdownStyle, setDropdownStyle] = useState({})
+  const [portalReady, setPortalReady] = useState(false)
+  const filterBarRef = useRef(null)
+  const dropdownPortalRef = useRef(null)
+  const triggerRefs = useRef({})
+
+  useEffect(() => {
+    setPortalReady(true)
+  }, [])
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const clickedInsideBar = filterBarRef.current?.contains(event.target)
+      const clickedInsidePortal = dropdownPortalRef.current?.contains(event.target)
+
+      if (!clickedInsideBar && !clickedInsidePortal) {
+        setActiveDropdown(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    if (!activeDropdown) return undefined
+
+    const updateDropdownPosition = () => {
+      const trigger = triggerRefs.current[activeDropdown]
+      if (!trigger) return
+
+      const rect = trigger.getBoundingClientRect()
+      const width = Math.min(760, window.innerWidth - 32)
+      const left = Math.min(
+        Math.max(16, rect.left),
+        Math.max(16, window.innerWidth - width - 16)
+      )
+
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 12,
+        left: `${left}px`,
+        width: `${width}px`,
+      })
+    }
+
+    updateDropdownPosition()
+    window.addEventListener('resize', updateDropdownPosition)
+    window.addEventListener('scroll', updateDropdownPosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updateDropdownPosition)
+      window.removeEventListener('scroll', updateDropdownPosition, true)
+    }
+  }, [activeDropdown])
 
   const handleToggleFilter = () => {
     setShowFilters(!showFilters)
@@ -68,30 +136,28 @@ export default function FilterBar({ onFilterChange }) {
   const handleQuickFilter = (filterId) => {
     const newFilters = {
       ...selectedFilters,
-      [filterId]: !selectedFilters[filterId]
+      [filterId]: !selectedFilters[filterId],
     }
     setSelectedFilters(newFilters)
     onFilterChange?.(newFilters, sortBy)
   }
 
   const handleDropdownToggle = (filterId) => {
-    setActiveDropdown(activeDropdown === filterId ? null : filterId)
+    setActiveDropdown((current) => (current === filterId ? null : filterId))
   }
 
   const handleOptionSelect = (filterId, option) => {
-    let newFilters = { ...selectedFilters }
-    
+    const newFilters = { ...selectedFilters }
+
     if (filterId === 'priceRange') {
       newFilters.priceRange = newFilters.priceRange?.label === option.label ? null : option
     } else {
       const currentValues = newFilters[filterId] || []
-      if (currentValues.includes(option)) {
-        newFilters[filterId] = currentValues.filter(v => v !== option)
-      } else {
-        newFilters[filterId] = [...currentValues, option]
-      }
+      newFilters[filterId] = currentValues.includes(option)
+        ? currentValues.filter((value) => value !== option)
+        : [...currentValues, option]
     }
-    
+
     setSelectedFilters(newFilters)
     onFilterChange?.(newFilters, sortBy)
   }
@@ -123,10 +189,10 @@ export default function FilterBar({ onFilterChange }) {
 
   const getActiveFilterCount = () => {
     let count = 0
-    if (selectedFilters.inStock) count++
-    if (selectedFilters.newArrival) count++
-    if (selectedFilters.priceRange) count++
-    Object.keys(selectedFilters).forEach(key => {
+    if (selectedFilters.inStock) count += 1
+    if (selectedFilters.newArrival) count += 1
+    if (selectedFilters.priceRange) count += 1
+    Object.keys(selectedFilters).forEach((key) => {
       if (Array.isArray(selectedFilters[key])) {
         count += selectedFilters[key].length
       }
@@ -134,133 +200,171 @@ export default function FilterBar({ onFilterChange }) {
     return count
   }
 
-  return (
-    <div className="filter-bar-wrapper">
-      <div className="filter-header">
-        <h2 className="filter-title">Chọn theo tiêu chí</h2>
-        {getActiveFilterCount() > 0 && (
-          <button className="clear-filters-btn" onClick={clearAllFilters}>
-            <FiX /> Xóa bộ lọc ({getActiveFilterCount()})
-          </button>
-        )}
-      </div>
-      
-      {showFilters && (
-        <div className="filter-row">
-          {filterConfig.map((filter) => {
-            const Icon = filter.icon
-            const isActive = filter.id === 'inStock' ? selectedFilters.inStock : 
-                           filter.id === 'newArrival' ? selectedFilters.newArrival :
-                           filter.id === 'priceRange' ? selectedFilters.priceRange !== null :
-                           selectedFilters[filter.id]?.length > 0
+  const getFilterSelectionCount = (filterId) => {
+    if (filterId === 'priceRange') return selectedFilters.priceRange ? 1 : 0
+    return Array.isArray(selectedFilters[filterId]) ? selectedFilters[filterId].length : 0
+  }
 
-            if (filter.isToggle) {
+  const renderDropdownOptions = (filter) => {
+    if (filter.type === 'price') {
+      return priceRanges.map((range) => {
+        const isSelected = selectedFilters.priceRange?.label === range.label
+        return (
+          <button
+            key={range.label}
+            type="button"
+            className={`filter-chip ${isSelected ? 'selected' : ''}`}
+            onClick={() => handleOptionSelect(filter.id, range)}
+          >
+            {range.label}
+          </button>
+        )
+      })
+    }
+
+    return (filter.options || []).map((option) => {
+      const isSelected = selectedFilters[filter.id]?.includes(option)
+      return (
+        <button
+          key={option}
+          type="button"
+          className={`filter-chip ${isSelected ? 'selected' : ''}`}
+          onClick={() => handleOptionSelect(filter.id, option)}
+        >
+          {option}
+        </button>
+      )
+    })
+  }
+
+  const activeFilter = filterConfig.find((filter) => filter.id === activeDropdown)
+
+  const dropdownPortal = activeDropdown && activeFilter && portalReady
+    ? createPortal(
+        <div className="filter-dropdown-menu" style={dropdownStyle}>
+          <div className="filter-dropdown-panel" ref={dropdownPortalRef}>
+            <div className="filter-chip-grid">
+              {renderDropdownOptions(activeFilter)}
+            </div>
+            <div className="filter-dropdown-actions">
+              <button type="button" className="filter-panel-btn filter-panel-btn-light" onClick={() => setActiveDropdown(null)}>
+                Đóng
+              </button>
+              <button type="button" className="filter-panel-btn filter-panel-btn-primary" onClick={() => setActiveDropdown(null)}>
+                Xem kết quả
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )
+    : null
+
+  return (
+    <>
+      <div className="filter-bar-wrapper" ref={filterBarRef}>
+        <div className="filter-header">
+          <h2 className="filter-title">Chon theo tieu chi</h2>
+          {getActiveFilterCount() > 0 && (
+            <button className="clear-filters-btn" onClick={clearAllFilters}>
+              <FiX /> Xóa bộ lọc ({getActiveFilterCount()})
+            </button>
+          )}
+        </div>
+
+        {showFilters && (
+          <div className="filter-row">
+            {filterConfig.map((filter) => {
+              const Icon = filter.icon
+              const isActive = filter.id === 'inStock'
+                ? selectedFilters.inStock
+                : filter.id === 'newArrival'
+                  ? selectedFilters.newArrival
+                  : filter.id === 'priceRange'
+                    ? selectedFilters.priceRange !== null
+                    : selectedFilters[filter.id]?.length > 0
+
+              if (filter.isToggle) {
+                return (
+                  <button
+                    key={filter.id}
+                    className={`filter-btn filter-toggle ${showFilters ? 'active' : ''}`}
+                    onClick={handleToggleFilter}
+                  >
+                    {Icon && <Icon />}
+                    {filter.label}
+                  </button>
+                )
+              }
+
+              if (filter.hasDropdown) {
+                return (
+                  <div key={filter.id} className="filter-dropdown-container">
+                    <button
+                      ref={(node) => {
+                        triggerRefs.current[filter.id] = node
+                      }}
+                      className={`filter-btn ${isActive ? 'active' : ''} ${activeDropdown === filter.id ? 'dropdown-open' : ''}`}
+                      onClick={() => handleDropdownToggle(filter.id)}
+                    >
+                      {Icon && <Icon />}
+                      {filter.label}
+                      <span className={`filter-info-badge ${isActive ? 'active' : ''}`}>
+                        {getFilterSelectionCount(filter.id) || <FiInfo size={12} />}
+                      </span>
+                      <FiChevronDown className={activeDropdown === filter.id ? 'rotate' : ''} />
+                    </button>
+                  </div>
+                )
+              }
+
               return (
                 <button
                   key={filter.id}
-                  className={`filter-btn filter-toggle ${showFilters ? 'active' : ''}`}
-                  onClick={handleToggleFilter}
+                  className={`filter-btn ${isActive ? 'active' : ''}`}
+                  onClick={() => handleQuickFilter(filter.id)}
                 >
                   {Icon && <Icon />}
                   {filter.label}
                 </button>
               )
-            }
+            })}
+          </div>
+        )}
 
-            if (filter.hasDropdown) {
-              return (
-                <div key={filter.id} className="filter-dropdown-container">
-                  <button
-                    className={`filter-btn ${isActive ? 'active' : ''} ${activeDropdown === filter.id ? 'dropdown-open' : ''}`}
-                    onClick={() => handleDropdownToggle(filter.id)}
-                  >
-                    {Icon && <Icon />}
-                    {filter.label}
-                    {isActive && selectedFilters[filter.id]?.length > 0 && (
-                      <span className="filter-count">({selectedFilters[filter.id].length})</span>
-                    )}
-                    {isActive && filter.id === 'priceRange' && (
-                      <span className="filter-count">(1)</span>
-                    )}
-                    <FiChevronDown className={activeDropdown === filter.id ? 'rotate' : ''} />
-                  </button>
-                  
-                  {activeDropdown === filter.id && (
-                    <div className="filter-dropdown-menu">
-                      {filter.type === 'price' ? (
-                        priceRanges.map((range, idx) => (
-                          <label key={idx} className="filter-option">
-                            <input
-                              type="radio"
-                              checked={selectedFilters.priceRange?.label === range.label}
-                              onChange={() => handleOptionSelect(filter.id, range)}
-                            />
-                            <span>{range.label}</span>
-                          </label>
-                        ))
-                      ) : (
-                        filter.options?.map((option, idx) => (
-                          <label key={idx} className="filter-option">
-                            <input
-                              type="checkbox"
-                              checked={selectedFilters[filter.id]?.includes(option)}
-                              onChange={() => handleOptionSelect(filter.id, option)}
-                            />
-                            <span>{option}</span>
-                          </label>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            }
-
-            return (
-              <button
-                key={filter.id}
-                className={`filter-btn ${isActive ? 'active' : ''}`}
-                onClick={() => handleQuickFilter(filter.id)}
-              >
-                {Icon && <Icon />}
-                {filter.label}
-              </button>
-            )
-          })}
+        <div className="sort-row">
+          <h2 className="sort-title">Sắp xếp theo</h2>
+          <button
+            className={`sort-btn ${sortBy === 'popular' ? 'selected' : ''}`}
+            onClick={() => handleSort('popular')}
+          >
+            <FiStar />
+            Phổ biến nhất
+          </button>
+          <button
+            className={`sort-btn ${sortBy === 'promotion' ? 'selected' : ''}`}
+            onClick={() => handleSort('promotion')}
+          >
+            <FiTag />
+            Khuyến mãi HOT
+          </button>
+          <button
+            className={`sort-btn ${sortBy === 'priceAsc' ? 'selected' : ''}`}
+            onClick={() => handleSort('priceAsc')}
+          >
+            <FiArrowUp />
+            Giá Thấp - Cao
+          </button>
+          <button
+            className={`sort-btn ${sortBy === 'priceDesc' ? 'selected' : ''}`}
+            onClick={() => handleSort('priceDesc')}
+          >
+            <FiArrowDown />
+            Giá Cao - Thấp
+          </button>
         </div>
-      )}
-  
-      <div className="sort-row">
-        <h2 className="sort-title">Sắp xếp theo</h2>
-        <button
-          className={`sort-btn ${sortBy === 'popular' ? 'selected' : ''}`}
-          onClick={() => handleSort('popular')}
-        >
-          <FiStar />
-          Phổ biến
-        </button>
-        <button
-          className={`sort-btn ${sortBy === 'promotion' ? 'selected' : ''}`}
-          onClick={() => handleSort('promotion')}
-        >
-          <FiTag />
-          Khuyến mãi HOT
-        </button>
-        <button
-          className={`sort-btn ${sortBy === 'priceAsc' ? 'selected' : ''}`}
-          onClick={() => handleSort('priceAsc')}
-        >
-          <FiArrowUp />
-          Giá Thấp - Cao
-        </button>
-        <button
-          className={`sort-btn ${sortBy === 'priceDesc' ? 'selected' : ''}`}
-          onClick={() => handleSort('priceDesc')}
-        >
-          <FiArrowDown />
-          Giá Cao - Thấp
-        </button>
       </div>
-    </div>
+      {dropdownPortal}
+    </>
   )
 }

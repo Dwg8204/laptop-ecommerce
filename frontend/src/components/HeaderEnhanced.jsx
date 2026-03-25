@@ -120,72 +120,63 @@ export default function Header() {
         <header style={styles.header}>
           <div style={styles.logo} onClick={() => navigate('/')}>LaptopShop</div>
 
-          <div style={styles.categoryMenuWrap} ref={categoryMenuRef}>
-            <button style={styles.categoryBtn} onClick={() => setShowCategoryMenu((prev) => !prev)}>
-              <FiList size={24} />
-              Danh mục
+          <div style={styles.leftGroup}>
+  <div style={styles.categoryMenuWrap} ref={categoryMenuRef}>
+    <button style={styles.categoryBtn} onClick={() => setShowCategoryMenu((prev) => !prev)}>
+      <FiList size={24} />
+      Danh mục
+    </button>
+    {showCategoryMenu && (
+      <div style={styles.categoryDropdown}>
+        {categoryItems.length === 0 ? (
+          <button style={styles.categoryItem} type="button" disabled>
+            Chưa có danh mục
+          </button>
+        ) : (
+          categoryItems.map((category) => (
+            <button
+              key={category.category_id}
+              style={styles.categoryItem}
+              type="button"
+              onClick={() => handleCategoryClick(category)}
+            >
+              {category.category_name}
             </button>
-            {showCategoryMenu && (
-        <div style={styles.categoryDropdown}>
-          {categoryItems.length === 0 ? (
-            <button style={styles.categoryItem} type="button" disabled>
-              Chưa có danh mục
-            </button>
-          ) : (
-            categoryItems.map((category) => (
-              <button
-                key={category.category_id}
-                style={styles.categoryItem}
-                type="button"
-                onClick={() => handleCategoryClick(category)}
-              >
-                {category.category_name}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-          </div>
+          ))
+        )}
+      </div>
+    )}
+  </div>
 
-          {/* <div style={styles.searchContainer}>
-            <FiSearch style={styles.searchIcon} />
-            <input
-              type="text"
-              placeholder="Bạn muốn mua gì hôm nay?"
-              style={styles.searchInput}
-            />
-          </div> */}
-          <div className="header-search-area">
-            <SearchSuggestBox />
-          </div>
+  <div style={styles.newsWrapper} onClick={() => navigate('/news')}>
+    <span>Tin tức</span>
+    <div style={styles.newsIcon}>
+      <MdFiberNew size={28} />
+      <span style={styles.newsBadge}>0</span>
+    </div>
+  </div>
+</div>
 
-          {/* Actions */}
-          <div style={styles.actions}>
-            {/* Cart */}
-            <div style={styles.cartWrapper} onClick={() => navigate('/cart')}>
-              <span>Giỏ hàng</span>
-              <div style={styles.cartIcon}>
-                <FiShoppingCart size={28} />
-                <span style={styles.cartBadge}>{getTotalItems()}</span>
-              </div>
-            </div>
-            {/*News*/}
-             <div style={styles.newsWrapper} onClick={()=> navigate('/news')}>
-              <span>Tin tức</span>
-              <div style={styles.newsIcon}>
-                <MdFiberNew size={28} />
-                <span style={styles.newsBadge}>0</span>
-              </div>
-            </div>
-              
-            {/*Notification*/}
-            <div style={styles.notificationWrapper} onClick={()=> navigate('/notifications')}>
-              <span>Thông báo</span>
-              <div style={styles.notificationIcon}>
-                <FiBell size={28} />
-                {user && unreadCount > 0 ? <span style={styles.notificationBadge}>{unreadCount}</span> : null}
-              </div>
-            </div>
+<div className="header-search-area" style={styles.searchArea}>
+  <SearchSuggestBox />
+</div>
+
+<div style={styles.actions}>
+  <div style={styles.cartWrapper} onClick={() => navigate('/cart')}>
+    <span>Giỏ hàng</span>
+    <div style={styles.cartIcon}>
+      <FiShoppingCart size={28} />
+      <span style={styles.cartBadge}>{getTotalItems()}</span>
+    </div>
+  </div>
+
+  <div style={styles.notificationWrapper} onClick={() => navigate('/notifications')}>
+    <span>Thông báo</span>
+    <div style={styles.notificationIcon}>
+      <FiBell size={28} />
+      {user && unreadCount > 0 ? <span style={styles.notificationBadge}>{unreadCount}</span> : null}
+    </div>
+  </div>
             {/* Login/User Menu */}
             {user ? (
               <div style={styles.userMenu}>
@@ -256,7 +247,27 @@ const styles = {
     fontFamily: '"Roboto", "Helvetica Neue", Arial, sans-serif',
     boxShadow: '0 10px 24px rgba(0, 0, 0, 0.12)'
   },
+leftGroup: {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '16px',
+  flexShrink: 0
+},
 
+searchArea: {
+  flex: 1,
+  minWidth: 0,
+  maxWidth: '420px'
+},
+header: {
+  background: '#e30019',
+  color: '#fff',
+  padding: '24px 24px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '24px',
+  width: '100%'
+},
   topBar: {
     background: 'linear-gradient(90deg, #e34d7b 0%, #d70018 55%, #d70018 100%)',
     color: '#fff',
@@ -294,11 +305,12 @@ const styles = {
   header: {
     background: '#e30019',
     color: '#fff',
-    padding: '24px 40px',
+    padding: '24px 24px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '30px'
+    gap: '24px',
+    width: '100%'
   },
 
   logo: {

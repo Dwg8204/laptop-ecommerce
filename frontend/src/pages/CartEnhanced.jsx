@@ -269,15 +269,14 @@ export default function Cart() {
         paymentStatus: paymentResponse?.data?.payment_status || 'UNPAID',
       })
 
-      clearCart()
-      setShowPaymentModal(false)
-      setSelectedPayment(null)
-      setAppliedVoucher(null)
-      setVoucherCode('')
-      setVoucherFeedback('')
-      setVoucherFeedbackType('')
-
       if (selectedPayment === 'COD') {
+        clearCart()
+        setShowPaymentModal(false)
+        setSelectedPayment(null)
+        setAppliedVoucher(null)
+        setVoucherCode('')
+        setVoucherFeedback('')
+        setVoucherFeedbackType('')
         alert(`Đặt hàng thành công! Mã đơn hàng: ${createdOrderId}\nHình thức thanh toán: COD`)
         navigate('/order-tracking')
         return
@@ -288,6 +287,7 @@ export default function Cart() {
         throw new Error('Không nhận được liên kết thanh toán từ cổng thanh toán')
       }
 
+      // Không clearCart, chỉ chuyển hướng sang cổng thanh toán
       window.location.href = paymentUrl
     } catch (error) {
       console.error('Checkout error:', error)
@@ -342,8 +342,8 @@ export default function Cart() {
             <div key={item.id} className="cart-item">
               <div className="col-product">
                 <div className="product-info">
-                  <img 
-                    src={item.image} 
+                  <img
+                    src={item.image ? `${item.image}${item.image.includes('?') ? '&' : '?'}t=${Date.now()}` : ''}
                     alt={item.name}
                     className="product-image"
                   />

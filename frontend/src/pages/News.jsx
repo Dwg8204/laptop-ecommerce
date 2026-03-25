@@ -121,9 +121,7 @@ export default function News() {
       <div className="news-container">
         {!id ? (
           <>
-            <button className="back-btn" onClick={handleGoBack}>
-              ← Quay lại
-            </button>
+          
 
             {/* Category filters */}
             {categories.length > 0 && (

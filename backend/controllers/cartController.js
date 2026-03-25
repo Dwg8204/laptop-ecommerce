@@ -134,11 +134,11 @@ const cartController = {
             if (affectedRows === 0) {
                 return res.status(400).json({ success: false, message: 'Không có thay đổi nào được thực hiện hoặc sản phẩm không có trong giỏ.' });
             }
-
+            const cartDetails = await Cart.getCartDetails(cartId) ;
             res.status(200).json({
                 success: true,
                 message: 'Cập nhật số lượng sản phẩm trong giỏ hàng thành công!',
-                data: { cart_id: cartId, variant_id, new_quantity: quantity }
+                data: { cart_id: cartId, items: cartDetails }
             });
         } catch (error) {
             console.error('Lỗi khi cập nhật giỏ hàng:', error);
@@ -165,10 +165,11 @@ const cartController = {
                 return res.status(404).json({ success: false, message: 'Sản phẩm không tồn tại trong giỏ hàng để xóa.' });
             }
 
+            const cartDetails = await Cart.getCartDetails(cartId);
             res.status(200).json({
                 success: true,
-                message: 'Xóa sản phẩm khỏi giỏ hàng thành công!',
-                data: { cart_id: cartId, variant_id: variantId }
+                message: 'Xóa sản phẩm khỏi giỏ hàng thành công!',  
+                data: { cart_id: cartId, items: cartDetails }
             });
         } catch (error) {
             console.error('Lỗi khi xóa sản phẩm khỏi giỏ hàng:', error);
